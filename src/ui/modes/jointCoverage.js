@@ -16,6 +16,7 @@ import {
   attachDualSlider,
 } from "../controls.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
+import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
 
 function defaults(record) {
   return {
@@ -208,24 +209,41 @@ function renderMain(record, pairs, state) {
     coveragePercent: cumulativeCoverage,
   });
 
-  const rowsHtml = selections
+  const cardsHtml = selections
     .map((selection, i) => {
       const assembled = assembledByDesign.get(selection.design);
-      return `
-        <tr>
-          <td>${i + 1}</td>
-          <td class="seq">${assembled.left.spacerSequence}</td>
-          <td class="seq">${assembled.left.rttSequence}</td>
-          <td class="seq">${assembled.left.pbsSequence}</td>
-          <td class="seq">${assembled.left.fullSequence}</td>
-          <td class="seq">${assembled.right.spacerSequence}</td>
-          <td class="seq">${assembled.right.rttSequence}</td>
-          <td class="seq">${assembled.right.pbsSequence}</td>
-          <td class="seq">${assembled.right.fullSequence}</td>
-          <td class="num">${selection.marginalCoveredLength}</td>
-          <td class="num cumulative">${selection.cumulativeCoveragePercent.toFixed(1)}%</td>
-          <td class="num">${selection.design.plan.overlapLength}</td>
-        </tr>`;
+      return buildPegrnaCardHtml({
+        setNumber: i + 1,
+        headerRight: [
+          { label: "New bases", value: String(selection.marginalCoveredLength) },
+          { label: "Cumulative", value: `${selection.cumulativeCoveragePercent.toFixed(1)}%`, teal: true },
+        ],
+        sides: [
+          {
+            title: "Left pegRNA",
+            stats: [
+              { label: "Spacer", value: assembled.left.spacerSequence },
+              { label: "PBS", value: assembled.left.pbsSequence },
+            ],
+            spacer: assembled.left.spacerSequence,
+            rtt: assembled.left.rttSequence,
+            pbs: assembled.left.pbsSequence,
+            lengthNt: assembled.left.fullLength,
+          },
+          {
+            title: "Right pegRNA",
+            stats: [
+              { label: "Spacer", value: assembled.right.spacerSequence },
+              { label: "PBS", value: assembled.right.pbsSequence },
+            ],
+            spacer: assembled.right.spacerSequence,
+            rtt: assembled.right.rttSequence,
+            pbs: assembled.right.pbsSequence,
+            lengthNt: assembled.right.fullLength,
+          },
+        ],
+        footnote: `Overlap ${selection.design.plan.overlapLength} nt, all designs use a ${state.pbs}-nt PBS.`,
+      });
     })
     .join("");
 
@@ -239,17 +257,13 @@ function renderMain(record, pairs, state) {
       <div class="stat-card"><div class="label">Candidate pairs</div><div class="stat-value">${pbsFeasibleDesigns.length.toLocaleString()}</div></div>
     </div>
 
-    <div class="data-table-wrap">
-      <table class="data-table">
-        <thead><tr>
-          <th>Set</th><th>Left spacer</th><th>Left RTT</th><th>Left PBS</th><th>Left pegRNA</th>
-          <th>Right spacer</th><th>Right RTT</th><th>Right PBS</th><th>Right pegRNA</th>
-          <th class="num">New bases</th><th class="num">Cumulative</th><th class="num">Overlap</th>
-        </tr></thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div class="label">Designs</div>
+      ${buildPegrnaLegendHtml()}
     </div>
 
-    <div class="caption">All displayed designs use a ${state.pbs}-nt PBS. Scroll horizontally to inspect complete sequences.</div>
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      ${cardsHtml}
+    </div>
   `;
 }

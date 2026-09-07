@@ -15,6 +15,7 @@ import {
   attachDualSlider,
 } from "../controls.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
+import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
 
 function defaults(record) {
   return {
@@ -181,23 +182,33 @@ function renderMain(record, guides, state) {
     coveragePercent: cumulativeCoverage,
   });
 
-  const rowsHtml = selections
+  const cardsHtml = selections
     .map((selection, i) => {
       const assembled = assembledByDesign.get(selection.design);
       const guide = selection.design.guide;
-      return `
-        <tr>
-          <td>${i + 1}</td>
-          <td>${guide.strand}</td>
-          <td class="seq">${assembled.spacerSequence}</td>
-          <td class="seq">${guide.pam}</td>
-          <td class="num">${guide.nickPosition}</td>
-          <td class="seq">${assembled.rttSequence}</td>
-          <td class="seq">${assembled.pbsSequence}</td>
-          <td class="seq">${assembled.fullSequence}</td>
-          <td class="num">${selection.marginalCoveredLength}</td>
-          <td class="num cumulative">${selection.cumulativeCoveragePercent.toFixed(1)}%</td>
-        </tr>`;
+      return buildPegrnaCardHtml({
+        setNumber: i + 1,
+        headerRight: [
+          { label: "New bases", value: String(selection.marginalCoveredLength) },
+          { label: "Cumulative", value: `${selection.cumulativeCoveragePercent.toFixed(1)}%`, teal: true },
+        ],
+        sides: [
+          {
+            title: "pegRNA",
+            badge: guide.strand,
+            stats: [
+              { label: "Spacer", value: assembled.spacerSequence },
+              { label: "PAM", value: guide.pam },
+              { label: "Nick", value: String(guide.nickPosition) },
+              { label: "PBS", value: assembled.pbsSequence },
+            ],
+            spacer: assembled.spacerSequence,
+            rtt: assembled.rttSequence,
+            pbs: assembled.pbsSequence,
+            lengthNt: assembled.fullLength,
+          },
+        ],
+      });
     })
     .join("");
 
@@ -211,16 +222,15 @@ function renderMain(record, guides, state) {
       <div class="stat-card"><div class="label">Candidate guides</div><div class="stat-value">${pbsFeasibleDesigns.length.toLocaleString()}</div></div>
     </div>
 
-    <div class="data-table-wrap">
-      <table class="data-table">
-        <thead><tr>
-          <th>Set</th><th>Strand</th><th>Spacer</th><th>PAM</th><th class="num">Nick</th>
-          <th>RTT</th><th>PBS</th><th>pegRNA</th><th class="num">New bases</th><th class="num">Cumulative</th>
-        </tr></thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div class="label">Designs</div>
+      ${buildPegrnaLegendHtml()}
     </div>
 
-    <div class="caption">All displayed designs use a ${state.pbs}-nt PBS. Scroll horizontally to inspect complete sequences.</div>
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      ${cardsHtml}
+    </div>
+
+    <div class="caption">All displayed designs use a ${state.pbs}-nt PBS.</div>
   `;
 }

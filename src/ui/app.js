@@ -48,14 +48,22 @@ function currentRecord() {
 
 function renderLanding() {
   root.innerHTML = `
-    <div class="app-shell">
-      <div class="landing-wrap">
-        <div style="display:flex;flex-direction:column;align-items:center;gap:18px;">
+    <div class="app-shell" style="position:relative;overflow:hidden;">
+      <div style="position:absolute;top:26px;left:50%;transform:translateX(-50%);width:min(1040px, 92vw);display:flex;flex-direction:column;gap:8px;pointer-events:none;">
+        <div style="position:relative;height:8px;"><div style="position:absolute;left:6%;width:15%;height:8px;border-radius:999px;background:var(--accent-soft);"></div></div>
+        <div style="position:relative;height:8px;"><div style="position:absolute;right:8%;width:19%;height:8px;border-radius:999px;background:var(--accent-soft);"></div></div>
+      </div>
+
+      <div class="landing-wrap" style="position:relative;padding-top:88px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:28px;">
           <div style="display:flex;align-items:center;gap:12px;">
-            ${logoMarkSvg(34)}
-            <span style="font-size:22px;font-weight:700;letter-spacing:-0.01em;">ErrPresso</span>
+            ${logoMarkSvg(26)}
+            <span style="font-size:17px;font-weight:700;letter-spacing:-0.01em;">ErrPresso</span>
           </div>
-          <div style="font-size:15px;color:var(--text-muted);text-align:center;">Err2 prime-editing design</div>
+          <div style="text-align:center;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:40px;font-weight:700;letter-spacing:-0.02em;line-height:1.1;">Err2 prime-editing design</div>
+            <div style="font-size:15px;color:var(--text-muted);">Paste a sequence. Get pegRNA pairs, ranked by coverage, in your browser.</div>
+          </div>
         </div>
 
         <div class="landing-card">

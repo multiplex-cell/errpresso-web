@@ -5,6 +5,7 @@ import { makePair } from "../../core/pairs.js";
 import { designPairedPegrnas } from "../../core/pegrnaDesign.js";
 import { stepperFieldHtml, attachStepperField, toggleHtml, attachToggle } from "../controls.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
+import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
 import { ICONS } from "../icons.js";
 
 function defaults(record) {
@@ -199,26 +200,41 @@ function renderMain(record, leftGuides, rightGuides, state) {
 
   const resultHtml = design
     ? `
-      <div class="label">Paired pegRNA design</div>
-      <div class="caption">Nick interval <span class="mono">${pair.leftGuide.nickPosition}</span>–<span class="mono">${pair.rightGuide.nickPosition}</span> · overlap <span class="mono">${design.plan.overlapStart}</span>–<span class="mono">${design.plan.overlapEnd}</span> (${design.plan.overlapLength} nt)</div>
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div class="label">Paired pegRNA design</div>
+        ${buildPegrnaLegendHtml()}
+      </div>
       ${design.plan.overlapLength === nickDistance ? '<div class="warning-box">The overlap covers the entire interval between the nick sites.</div>' : ""}
       ${Math.max(design.left.rttLength, design.right.rttLength) > 80 ? '<div class="warning-box">At least one RTT is longer than 80 nt. Long RTT designs may require additional experimental validation.</div>' : ""}
-      <div class="data-table-wrap">
-        <table class="data-table">
-          <thead><tr>
-            <th>Left spacer</th><th>Left PAM</th><th class="num">Left Nick</th><th>Left RTT</th><th>Left PBS</th><th>Left pegRNA</th>
-            <th>Right spacer</th><th>Right PAM</th><th class="num">Right Nick</th><th>Right RTT</th><th>Right PBS</th><th>Right pegRNA</th><th class="num">Overlap</th>
-          </tr></thead>
-          <tbody>
-            <tr>
-              <td class="seq">${design.left.spacerSequence}</td><td class="seq">${design.left.guide.pam}</td><td class="num">${design.left.guide.nickPosition}</td>
-              <td class="seq">${design.left.rttSequence}</td><td class="seq">${design.left.pbsSequence}</td><td class="seq">${design.left.fullSequence}</td>
-              <td class="seq">${design.right.spacerSequence}</td><td class="seq">${design.right.guide.pam}</td><td class="num">${design.right.guide.nickPosition}</td>
-              <td class="seq">${design.right.rttSequence}</td><td class="seq">${design.right.pbsSequence}</td><td class="seq">${design.right.fullSequence}</td><td class="num">${design.plan.overlapLength}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      ${buildPegrnaCardHtml({
+        setNumber: null,
+        headerRight: [{ label: "Overlap", value: `${design.plan.overlapLength} nt` }],
+        sides: [
+          {
+            title: "Left pegRNA",
+            stats: [
+              { label: "PAM", value: design.left.guide.pam },
+              { label: "Nick", value: String(design.left.guide.nickPosition) },
+            ],
+            spacer: design.left.spacerSequence,
+            rtt: design.left.rttSequence,
+            pbs: design.left.pbsSequence,
+            lengthNt: design.left.fullLength,
+          },
+          {
+            title: "Right pegRNA",
+            stats: [
+              { label: "PAM", value: design.right.guide.pam },
+              { label: "Nick", value: String(design.right.guide.nickPosition) },
+            ],
+            spacer: design.right.spacerSequence,
+            rtt: design.right.rttSequence,
+            pbs: design.right.pbsSequence,
+            lengthNt: design.right.fullLength,
+          },
+        ],
+        footnote: `Nick interval ${pair.leftGuide.nickPosition}–${pair.rightGuide.nickPosition} · overlap ${design.plan.overlapStart}–${design.plan.overlapEnd}`,
+      })}
     `
     : "";
 

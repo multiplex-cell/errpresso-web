@@ -6,6 +6,7 @@ import { designPairedPegrnas } from "../../core/pegrnaDesign.js";
 import { SequenceParseError } from "../../core/sequenceIo.js";
 import { stepperFieldHtml, attachStepperField, singleSliderHtml, attachSingleSlider } from "../controls.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
+import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
 import { escapeHtml } from "../domUtils.js";
 
 function defaults() {
@@ -151,24 +152,42 @@ function renderMain(record, guides, state) {
     coveragePercent,
   });
 
-  const rowsHtml = designs
+  const cardsHtml = designs
     .map((d, i) => {
       const fixedSide = d.left.guide === fixedGuide ? "Left" : "Right";
-      return `
-        <tr>
-          <td>${i + 1}</td>
-          <td>${fixedSide}</td>
-          <td class="seq">${d.left.spacerSequence}</td>
-          <td class="seq">${d.left.rttSequence}</td>
-          <td class="seq">${d.left.pbsSequence}</td>
-          <td class="seq">${d.left.fullSequence}</td>
-          <td class="seq">${d.right.spacerSequence}</td>
-          <td class="seq">${d.right.rttSequence}</td>
-          <td class="seq">${d.right.pbsSequence}</td>
-          <td class="seq">${d.right.fullSequence}</td>
-          <td class="num">${d.pair.nickDistance}</td>
-          <td class="num">${d.plan.overlapLength}</td>
-        </tr>`;
+      return buildPegrnaCardHtml({
+        setNumber: i + 1,
+        headerRight: [
+          { label: "Nick distance", value: String(d.pair.nickDistance) },
+          { label: "Overlap", value: `${d.plan.overlapLength} nt` },
+        ],
+        sides: [
+          {
+            title: "Left pegRNA",
+            badge: fixedSide === "Left" ? "Fixed" : undefined,
+            stats: [
+              { label: "Spacer", value: d.left.spacerSequence },
+              { label: "PBS", value: d.left.pbsSequence },
+            ],
+            spacer: d.left.spacerSequence,
+            rtt: d.left.rttSequence,
+            pbs: d.left.pbsSequence,
+            lengthNt: d.left.fullLength,
+          },
+          {
+            title: "Right pegRNA",
+            badge: fixedSide === "Right" ? "Fixed" : undefined,
+            stats: [
+              { label: "Spacer", value: d.right.spacerSequence },
+              { label: "PBS", value: d.right.pbsSequence },
+            ],
+            spacer: d.right.spacerSequence,
+            rtt: d.right.rttSequence,
+            pbs: d.right.pbsSequence,
+            lengthNt: d.right.fullLength,
+          },
+        ],
+      });
     })
     .join("");
 
@@ -180,15 +199,16 @@ function renderMain(record, guides, state) {
       <div class="stat-card"><div class="label">Sequence covered</div><div class="stat-value teal">${coveragePercent.toFixed(1)}%</div></div>
       <div class="stat-card"><div class="label">Compatible partners</div><div class="stat-value">${compatiblePairs.length.toLocaleString()}</div></div>
     </div>
-    <div class="data-table-wrap">
-      <table class="data-table">
-        <thead><tr>
-          <th>Order</th><th>Fixed side</th><th>Left spacer</th><th>Left RTT</th><th>Left PBS</th><th>Left pegRNA</th>
-          <th>Right spacer</th><th>Right RTT</th><th>Right PBS</th><th>Right pegRNA</th><th class="num">Nick distance</th><th class="num">Overlap</th>
-        </tr></thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
+
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div class="label">Designs</div>
+      ${buildPegrnaLegendHtml()}
     </div>
+
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      ${cardsHtml}
+    </div>
+
     <div class="caption">The preferred RTT-size window is ignored in this mode; every design uses exactly the chosen overlap length.</div>
   `;
 }
