@@ -1,0 +1,10 @@
+{
+  "name": "errpresso-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ErrPresso -- paired prime-editing pegRNA design, entirely client-side.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
