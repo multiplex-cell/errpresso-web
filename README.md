@@ -50,6 +50,7 @@ src/core/            the design algorithm -- pure functions, no DOM
 src/ui/              UI shell, controls, and the four design-mode modules
 src/styles.css       design tokens and shared component styles
 tests/               node:test unit tests for src/core/
+data/genes_hg38.tsv  bundled gene symbol index for the "Fetch by gene" picker
 ```
 
 ## Status
@@ -57,8 +58,10 @@ tests/               node:test unit tests for src/core/
 Guide discovery, pairing, RTT/PBS design, and all four design modes are
 implemented and tested against the Python original's test suite. Every mode's
 results can be exported as a CSV of the underlying pegRNA designs.
-Fetch-by-gene looks up a gene's MANE Select transcript on the UCSC Genome
-Browser (hg38) and fetches one exon plus flanking sequence, directly from the
+Fetch-by-gene picks from a bundled local index of ~28,000 gene symbols
+(typo-proof, and skips a live search call) or accepts free-text symbols
+looked up live, then fetches a gene's MANE Select transcript and one exon
+plus flanking sequence from the UCSC Genome Browser (hg38), directly from the
 browser (UCSC's public API allows cross-origin requests, so this still needs
 no server of its own).
 

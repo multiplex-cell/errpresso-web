@@ -1,9 +1,27 @@
-// "Fetch by gene" input-tab panel -- resolve a gene symbol + exon to a
-// sequence via the UCSC Genome Browser REST API (src/core/geneFetch.js),
-// then hand the result up to the caller as FASTA text.
+// "Fetch by gene" input-tab panel -- pick a gene from the bundled local
+// index (fast path, no live search) or type one free-text (falls back to
+// a live UCSC lookup), then resolve an exon + flanks to a sequence via
+// src/core/geneFetch.js, and hand the result up to the caller as FASTA text.
 
-import { fetchGeneStructure, fetchExonWithFlanks, GeneFetchError } from "../core/geneFetch.js";
+import {
+  fetchGeneStructure,
+  fetchGeneStructureForKnownRegion,
+  fetchExonWithFlanks,
+  GeneFetchError,
+} from "../core/geneFetch.js";
+import { loadGeneIndex } from "../core/geneIndex.js";
 import { escapeHtml } from "./domUtils.js";
+
+const MAX_SUGGESTIONS = 8;
+
+// Module-level, not per-panel-instance: the index is the same for the life
+// of the page, and this lets suggestions appear instantly on every render
+// after the first (loadGeneIndex() itself is also memoized, so this is
+// just a synchronous read of an already-resolved value).
+let cachedIndexEntries = null;
+loadGeneIndex().then((entries) => {
+  cachedIndexEntries = entries;
+});
 
 export function defaultGeneState() {
   return {
@@ -31,10 +49,11 @@ export function renderGeneFetchPanel(container, state, rerender, onFetched) {
 
   container.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px;padding:2px 0 4px;">
-      <div class="caption">Looks up the gene's MANE Select transcript on the UCSC Genome Browser (hg38) and fetches only the exon and flanking sequence you request.</div>
-      <div style="display:flex;gap:10px;">
-        <input type="text" id="gene-symbol-input" class="field" style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:13px;" placeholder="Gene symbol, e.g. BRCA2" value="${escapeHtml(state.symbol)}">
+      <div class="caption">Pick a gene from the list, or type one and look it up directly. Fetches only the exon and flanking sequence you request from the UCSC Genome Browser (hg38).</div>
+      <div style="position:relative;display:flex;gap:10px;">
+        <input type="text" id="gene-symbol-input" class="field" style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:13px;" placeholder="Gene symbol, e.g. BRCA2" value="${escapeHtml(state.symbol)}" autocomplete="off">
         <button class="btn btn-primary" id="gene-lookup-btn" ${state.lookupLoading ? "disabled" : ""}>${state.lookupLoading ? "Looking up…" : "Look up gene"}</button>
+        <div id="gene-suggestions" class="gene-suggest-panel" hidden></div>
       </div>
       ${state.lookupError ? `<div class="warning-box">${escapeHtml(state.lookupError)}</div>` : ""}
       ${structure ? structureStageHtml(state) : ""}
@@ -42,35 +61,102 @@ export function renderGeneFetchPanel(container, state, rerender, onFetched) {
   `;
 
   const symbolInput = container.querySelector("#gene-symbol-input");
+  const suggestBox = container.querySelector("#gene-suggestions");
+
   symbolInput.focus();
   symbolInput.selectionStart = symbolInput.selectionEnd = symbolInput.value.length;
+
   symbolInput.addEventListener("input", (e) => {
     state.symbol = e.target.value;
+    renderSuggestions(e.target.value);
+  });
+  symbolInput.addEventListener("blur", () => {
+    suggestBox.hidden = true;
   });
   symbolInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      lookUpGene();
+      const firstRow = !suggestBox.hidden && suggestBox.querySelector(".gene-suggest-row");
+      if (firstRow) {
+        selectGene(firstRow.dataset.symbol);
+      } else {
+        lookUpGene();
+      }
+    } else if (e.key === "Escape") {
+      suggestBox.hidden = true;
     }
   });
 
-  container.querySelector("#gene-lookup-btn").addEventListener("click", lookUpGene);
+  container.querySelector("#gene-lookup-btn").addEventListener("click", () => lookUpGene());
 
-  async function lookUpGene() {
-    if (!state.symbol.trim()) {
+  function renderSuggestions(query) {
+    const trimmed = query.trim().toUpperCase();
+
+    if (!trimmed || !cachedIndexEntries) {
+      suggestBox.hidden = true;
+      suggestBox.innerHTML = "";
+      return;
+    }
+
+    const matches = cachedIndexEntries.filter((entry) => entry.symbol.startsWith(trimmed)).slice(0, MAX_SUGGESTIONS);
+
+    if (!matches.length) {
+      suggestBox.hidden = true;
+      suggestBox.innerHTML = "";
+      return;
+    }
+
+    suggestBox.innerHTML = matches
+      .map(
+        (entry) => `
+          <div class="gene-suggest-row" data-symbol="${escapeHtml(entry.symbol)}">
+            <span class="mono" style="font-weight:600;flex-shrink:0;">${escapeHtml(entry.symbol)}</span>
+            ${entry.name ? `<span class="gene-suggest-desc">${escapeHtml(entry.name)}</span>` : ""}
+          </div>`
+      )
+      .join("");
+    suggestBox.hidden = false;
+
+    suggestBox.querySelectorAll(".gene-suggest-row").forEach((row) => {
+      // mousedown (not click) fires before the input's blur, so the pick
+      // registers before the dropdown-hiding blur handler runs.
+      row.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        selectGene(row.dataset.symbol);
+      });
+    });
+  }
+
+  function selectGene(symbol) {
+    state.symbol = symbol;
+    suggestBox.hidden = true;
+    suggestBox.innerHTML = "";
+    const entry = cachedIndexEntries && cachedIndexEntries.find((e) => e.symbol === symbol);
+    lookUpGene(entry);
+  }
+
+  async function lookUpGene(knownEntry) {
+    const symbol = (knownEntry ? knownEntry.symbol : state.symbol).trim();
+
+    if (!symbol) {
       state.lookupError = "Enter a gene symbol first.";
       state.structure = null;
       rerender();
       return;
     }
 
+    state.symbol = symbol;
     state.lookupLoading = true;
     state.lookupError = null;
     state.structure = null;
     rerender();
 
     try {
-      state.structure = await fetchGeneStructure(state.symbol);
+      // Picked from the index -> its chrom/start/end are already known, so
+      // skip the live /search call and go straight to the transcript.
+      state.structure = knownEntry
+        ? await fetchGeneStructureForKnownRegion(knownEntry)
+        : await fetchGeneStructure(symbol);
       state.exonNumber = 1;
       state.fetchError = null;
     } catch (error) {

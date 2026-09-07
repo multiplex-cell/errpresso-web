@@ -180,18 +180,7 @@ async function selectTranscript(geneSymbol, assembly, chrom, regionStart, region
  *
  * @returns {Promise<{geneSymbol: string, assembly: string, chrom: string, strand: "+"|"-", transcriptId: string, transcriptSource: string, exons: Array<{number: number, start: number, end: number, length: number}>}>}
  */
-export async function fetchGeneStructure(geneSymbol, assembly = ASSEMBLY) {
-  const symbol = geneSymbol.trim();
-  if (!symbol) {
-    throw new GeneFetchError("Enter a gene symbol.");
-  }
-
-  const cacheKey = `${assembly}:${symbol.toUpperCase()}`;
-  if (structureCache.has(cacheKey)) {
-    return structureCache.get(cacheKey);
-  }
-
-  const { chrom, regionStart, regionEnd } = await resolveGeneRegion(symbol, assembly);
+async function buildAndCacheStructure(symbol, assembly, cacheKey, chrom, regionStart, regionEnd) {
   const { transcript, source } = await selectTranscript(symbol, assembly, chrom, regionStart, regionEnd);
 
   const strand = transcript.strand;
@@ -223,6 +212,38 @@ export async function fetchGeneStructure(geneSymbol, assembly = ASSEMBLY) {
 
   structureCache.set(cacheKey, structure);
   return structure;
+}
+
+export async function fetchGeneStructure(geneSymbol, assembly = ASSEMBLY) {
+  const symbol = geneSymbol.trim();
+  if (!symbol) {
+    throw new GeneFetchError("Enter a gene symbol.");
+  }
+
+  const cacheKey = `${assembly}:${symbol.toUpperCase()}`;
+  if (structureCache.has(cacheKey)) {
+    return structureCache.get(cacheKey);
+  }
+
+  const { chrom, regionStart, regionEnd } = await resolveGeneRegion(symbol, assembly);
+  return buildAndCacheStructure(symbol, assembly, cacheKey, chrom, regionStart, regionEnd);
+}
+
+/**
+ * Same as fetchGeneStructure(), but for a gene symbol picked from the
+ * bundled local index (src/core/geneIndex.js) -- since the index already
+ * carries the gene's chromosome and coordinate span, this skips the live
+ * /search call entirely and goes straight to resolving the transcript.
+ *
+ * @param {{symbol: string, chrom: string, start: number, end: number, assembly?: string}} region
+ */
+export async function fetchGeneStructureForKnownRegion({ symbol, chrom, start, end, assembly = ASSEMBLY }) {
+  const cacheKey = `${assembly}:${symbol.toUpperCase()}`;
+  if (structureCache.has(cacheKey)) {
+    return structureCache.get(cacheKey);
+  }
+
+  return buildAndCacheStructure(symbol, assembly, cacheKey, chrom, start, end);
 }
 
 /** Fetch plus-strand reference sequence for one coordinate range. Cached
