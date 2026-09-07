@@ -56,9 +56,11 @@ tests/               node:test unit tests for src/core/
 
 Guide discovery, pairing, RTT/PBS design, and all four design modes are
 implemented and tested against the Python original's test suite. Every mode's
-results can be exported as a CSV of the underlying pegRNA designs. Fetch-by-gene
-(UCSC) is not yet wired up in this version -- paste or upload a sequence
-directly for now.
+results can be exported as a CSV of the underlying pegRNA designs.
+Fetch-by-gene looks up a gene's MANE Select transcript on the UCSC Genome
+Browser (hg38) and fetches one exon plus flanking sequence, directly from the
+browser (UCSC's public API allows cross-origin requests, so this still needs
+no server of its own).
 
 ## Scientific positioning
 

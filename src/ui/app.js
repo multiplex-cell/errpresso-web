@@ -11,6 +11,7 @@ import { renderJointCoverageMode } from "./modes/jointCoverage.js";
 import { renderFixedGuideMode } from "./modes/fixedGuide.js";
 import { renderManualPairMode } from "./modes/manualPair.js";
 import { renderSinglePegrnaMode } from "./modes/singlePegrna.js";
+import { renderGeneFetchPanel, defaultGeneState } from "./geneFetchPanel.js";
 
 const EXAMPLE_FASTA =
   ">KRAS_exon2 ErrPresso demo sequence\n" +
@@ -34,6 +35,7 @@ const appState = {
   modeState: {}, // per-mode persisted params, keyed by mode id
   inputTab: "paste",
   inputText: "",
+  geneState: defaultGeneState(),
 };
 
 const root = document.getElementById("app");
@@ -127,11 +129,12 @@ function renderInputBody() {
       renderLanding();
     });
   } else {
-    body.innerHTML = `
-      <div style="padding:20px;color:var(--text-muted);font-size:13.5px;line-height:1.6;">
-        Fetch-by-gene (UCSC) is coming in a follow-up -- for now, paste or upload a
-        sequence directly.
-      </div>`;
+    renderGeneFetchPanel(body, appState.geneState, renderLanding, (fastaText) => {
+      appState.geneState = defaultGeneState();
+      appState.inputTab = "paste";
+      appState.inputText = fastaText;
+      renderLanding();
+    });
   }
 }
 
