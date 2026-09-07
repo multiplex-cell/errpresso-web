@@ -21,9 +21,9 @@ function rowNumber(label) {
 function nickMarker(edge) {
   const common = "position:absolute;top:50%;transform:translateY(-50%);width:0;height:0;";
   if (edge === "left") {
-    return `<div style="${common}left:-1px;border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:6px solid var(--accent);"></div>`;
+    return `<div style="${common}left:-1px;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:5px solid var(--accent);"></div>`;
   }
-  return `<div style="${common}right:-1px;border-top:5px solid transparent;border-bottom:5px solid transparent;border-right:6px solid var(--accent);"></div>`;
+  return `<div style="${common}right:-1px;border-top:4px solid transparent;border-bottom:4px solid transparent;border-right:5px solid var(--accent);"></div>`;
 }
 
 // Plain end-cap for a non-nick edge (e.g. where a single guide's RTT
@@ -81,9 +81,9 @@ export function buildCoverageMapHtml({
         (nickEdge === "right" || nickEdge === "both" ? nickMarker("right") : endCap("right"));
 
       return `
-        <div style="display:flex;align-items:center;gap:10px;height:26px;">
-          <span class="mono" style="width:${GUTTER - 10}px;flex-shrink:0;display:flex;align-items:center;justify-content:center;height:20px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:700;">${rowNumber(row.label)}</span>
-          <div style="position:relative;flex:1;height:22px;">
+        <div style="display:flex;align-items:center;gap:10px;height:18px;">
+          <span class="mono" style="width:${GUTTER - 10}px;flex-shrink:0;display:flex;align-items:center;justify-content:center;height:16px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:10px;font-weight:700;">${rowNumber(row.label)}</span>
+          <div style="position:relative;flex:1;height:12px;">
             <div style="position:absolute;left:${left}%;width:${width}%;top:0;bottom:0;border-radius:999px;background:var(--accent-soft);border:1px solid var(--accent-line);box-shadow:0 1px 2px oklch(0% 0 0 / 0.05);"></div>
             <div style="position:absolute;left:${left}%;width:${width}%;top:0;bottom:0;">${markers}</div>
             ${overlapHtml}
@@ -121,8 +121,8 @@ export function buildCoverageMapHtml({
     .join("");
 
   return `
-    <div class="panel" style="padding:24px 26px 20px;">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;">
+    <div class="panel" style="padding:20px 24px 16px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;">
         <div class="label">Coverage track</div>
         <div style="display:flex;align-items:baseline;gap:6px;">
           <span style="font-size:22px;font-weight:700;color:var(--teal);letter-spacing:-0.01em;">${coveragePercent.toFixed(1)}%</span>
@@ -131,28 +131,28 @@ export function buildCoverageMapHtml({
       </div>
 
       <div style="position:relative;">
-        <div style="position:absolute;left:${GUTTER}px;right:0;top:0;bottom:34px;">
+        <div style="position:absolute;left:${GUTTER}px;right:0;top:0;bottom:18px;">
           ${gridlinesHtml}
           <div style="position:absolute;top:0;bottom:0;left:${targetLeft}%;width:${Math.max(0.2, targetRight - targetLeft)}%;background:var(--accent-soft);opacity:0.35;"></div>
         </div>
 
-        <div style="position:relative;display:flex;flex-direction:column;gap:6px;">
+        <div style="position:relative;display:flex;flex-direction:column;gap:4px;">
           ${rowsHtml}
 
-          <div style="height:1px;background:var(--border-soft);margin:8px 0 8px ${GUTTER}px;"></div>
+          <div style="height:1px;background:var(--border-soft);margin:6px 0 6px ${GUTTER}px;"></div>
 
-          <div style="display:flex;align-items:center;gap:10px;height:14px;">
-            <span style="width:${GUTTER - 10}px;font-size:11px;color:var(--text-faint);flex-shrink:0;text-align:center;">Target</span>
-            <div style="position:relative;flex:1;height:8px;">
-              <div style="position:absolute;left:${targetLeft}%;right:${100 - targetRight}%;top:3px;height:2px;background:var(--text-muted);"></div>
-              <div style="position:absolute;left:${targetLeft}%;top:0;width:2px;height:8px;background:var(--text-muted);"></div>
-              <div style="position:absolute;right:${100 - targetRight}%;top:0;width:2px;height:8px;background:var(--text-muted);"></div>
+          <div style="display:flex;align-items:center;gap:10px;height:12px;">
+            <span style="width:${GUTTER - 10}px;font-size:10.5px;color:var(--text-faint);flex-shrink:0;text-align:center;">Target</span>
+            <div style="position:relative;flex:1;height:7px;">
+              <div style="position:absolute;left:${targetLeft}%;right:${100 - targetRight}%;top:3px;height:1.5px;background:var(--text-muted);"></div>
+              <div style="position:absolute;left:${targetLeft}%;top:0;width:2px;height:7px;background:var(--text-muted);"></div>
+              <div style="position:absolute;right:${100 - targetRight}%;top:0;width:2px;height:7px;background:var(--text-muted);"></div>
             </div>
           </div>
 
-          <div style="display:flex;align-items:center;gap:10px;height:16px;">
-            <span style="width:${GUTTER - 10}px;font-size:11px;color:var(--text-faint);flex-shrink:0;text-align:center;">Covered</span>
-            <div style="position:relative;flex:1;height:16px;border-radius:999px;background:var(--border-soft);">
+          <div style="display:flex;align-items:center;gap:10px;height:11px;">
+            <span style="width:${GUTTER - 10}px;font-size:10.5px;color:var(--text-faint);flex-shrink:0;text-align:center;">Covered</span>
+            <div style="position:relative;flex:1;height:11px;border-radius:999px;background:var(--border-soft);">
               ${coveredHtml}
             </div>
           </div>
