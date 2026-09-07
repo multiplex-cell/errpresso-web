@@ -16,6 +16,20 @@ import {
 } from "../controls.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
+import {
+  slugify,
+  pegrnaSideRow,
+  PEGRNA_BASE_COLUMNS,
+  downloadCsvButtonHtml,
+  wireDownloadButton,
+} from "../csvExport.js";
+
+const CSV_COLUMNS = [
+  { key: "set", label: "set" },
+  ...PEGRNA_BASE_COLUMNS,
+  { key: "new_bases", label: "new_bases" },
+  { key: "cumulative_coverage_percent", label: "cumulative_coverage_percent" },
+];
 
 function defaults(record) {
   return {
@@ -100,7 +114,9 @@ export function renderSinglePegrnaMode({ record, guides, state, sidebarExtra, ma
   });
 
   function recompute() {
-    mainContent.innerHTML = renderMain(record, guides, state);
+    const { html, download } = renderMain(record, guides, state);
+    mainContent.innerHTML = html;
+    wireDownloadButton(mainContent, download);
   }
 
   recompute();
@@ -108,7 +124,7 @@ export function renderSinglePegrnaMode({ record, guides, state, sidebarExtra, ma
 
 function renderMain(record, guides, state) {
   if (state.targetEnd <= state.targetStart) {
-    return `<div class="label">Joint coverage map</div><div class="warning-box">The target interval must contain at least one base.</div>`;
+    return { html: `<div class="label">Joint coverage map</div><div class="warning-box">The target interval must contain at least one base.</div>`, download: null };
   }
 
   const minimumRttLength = Math.max(1, state.preferredRtt - state.wiggle);
@@ -142,7 +158,7 @@ function renderMain(record, guides, state) {
   const caption = `<div class="caption">Each RTT must fall within ${minimumRttLength}–${maximumRttLength} nt, shrinking automatically for guides too close to either end of the sequence to reach the preferred length.</div>`;
 
   if (!pbsFeasibleDesigns.length) {
-    return `${caption}<div class="warning-box">No guide satisfies the selected RTT and PBS constraints. Try widening the wiggle room or shortening the PBS.</div>`;
+    return { html: `${caption}<div class="warning-box">No guide satisfies the selected RTT and PBS constraints. Try widening the wiggle room or shortening the PBS.</div>`, download: null };
   }
 
   const selections = selectSynergisticSingleDesigns({
@@ -154,7 +170,7 @@ function renderMain(record, guides, state) {
   });
 
   if (!selections.length) {
-    return `${caption}<div class="warning-box">No feasible guide contributes coverage to the target.</div>`;
+    return { html: `${caption}<div class="warning-box">No feasible guide contributes coverage to the target.</div>`, download: null };
   }
 
   const cumulativeCoverage = selections[selections.length - 1].cumulativeCoveragePercent;
@@ -182,12 +198,28 @@ function renderMain(record, guides, state) {
     coveragePercent: cumulativeCoverage,
   });
 
+  const csvRows = [];
+
   const cardsHtml = selections
     .map((selection, i) => {
       const assembled = assembledByDesign.get(selection.design);
       const guide = selection.design.guide;
+      const setNumber = i + 1;
+
+      csvRows.push(
+        pegrnaSideRow(
+          {
+            set: setNumber,
+            new_bases: selection.marginalCoveredLength,
+            cumulative_coverage_percent: selection.cumulativeCoveragePercent.toFixed(1),
+          },
+          "",
+          assembled
+        )
+      );
+
       return buildPegrnaCardHtml({
-        setNumber: i + 1,
+        setNumber,
         headerRight: [
           { label: "New bases", value: String(selection.marginalCoveredLength) },
           { label: "Cumulative", value: `${selection.cumulativeCoveragePercent.toFixed(1)}%`, teal: true },
@@ -212,7 +244,13 @@ function renderMain(record, guides, state) {
     })
     .join("");
 
-  return `
+  const download = {
+    filename: `errpresso_single-pegrna_${slugify(record.recordId)}.csv`,
+    rows: csvRows,
+    columns: CSV_COLUMNS,
+  };
+
+  const html = `
     <div class="label">Joint coverage map</div>
     ${mapHtml}
 
@@ -224,7 +262,10 @@ function renderMain(record, guides, state) {
 
     <div style="display: flex; align-items: center; justify-content: space-between;">
       <div class="label">Designs</div>
-      ${buildPegrnaLegendHtml()}
+      <div style="display: flex; align-items: center; gap: 16px;">
+        ${buildPegrnaLegendHtml()}
+        ${downloadCsvButtonHtml("download-csv-btn")}
+      </div>
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 14px;">
@@ -233,4 +274,6 @@ function renderMain(record, guides, state) {
 
     <div class="caption">All displayed designs use a ${state.pbs}-nt PBS.</div>
   `;
+
+  return { html, download };
 }

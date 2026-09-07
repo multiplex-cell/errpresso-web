@@ -17,6 +17,21 @@ import {
 } from "../controls.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
+import {
+  slugify,
+  pegrnaSideRow,
+  PEGRNA_BASE_COLUMNS,
+  downloadCsvButtonHtml,
+  wireDownloadButton,
+} from "../csvExport.js";
+
+const CSV_COLUMNS = [
+  { key: "set", label: "set" },
+  ...PEGRNA_BASE_COLUMNS,
+  { key: "new_bases", label: "new_bases" },
+  { key: "cumulative_coverage_percent", label: "cumulative_coverage_percent" },
+  { key: "overlap_length_nt", label: "overlap_length_nt" },
+];
 
 function defaults(record) {
   return {
@@ -112,7 +127,9 @@ export function renderJointCoverageMode({ record, pairs, state, sidebarExtra, ma
   });
 
   function recompute() {
-    mainContent.innerHTML = renderMain(record, pairs, state);
+    const { html, download } = renderMain(record, pairs, state);
+    mainContent.innerHTML = html;
+    wireDownloadButton(mainContent, download);
   }
 
   recompute();
@@ -120,11 +137,11 @@ export function renderJointCoverageMode({ record, pairs, state, sidebarExtra, ma
 
 function renderMain(record, pairs, state) {
   if (state.targetEnd <= state.targetStart) {
-    return `<div class="label">Joint coverage map</div><div class="warning-box">The target interval must contain at least one base.</div>`;
+    return { html: `<div class="label">Joint coverage map</div><div class="warning-box">The target interval must contain at least one base.</div>`, download: null };
   }
 
   if (!pairs.length) {
-    return `<div class="warning-box">No inward-facing forward/reverse guide pairs were found, so twinPE modes aren't available for this sequence. Try Single pegRNA instead.</div>`;
+    return { html: `<div class="warning-box">No inward-facing forward/reverse guide pairs were found, so twinPE modes aren't available for this sequence. Try Single pegRNA instead.</div>`, download: null };
   }
 
   const minimumRttLength = Math.max(1, state.preferredRtt - state.wiggle);
@@ -170,7 +187,7 @@ function renderMain(record, pairs, state) {
   const caption = `<div class="caption">Each RTT must fall within ${minimumRttLength}–${maximumRttLength} nt. The overlap is placed automatically to balance the two RTT lengths.</div>`;
 
   if (!pbsFeasibleDesigns.length) {
-    return `${caption}<div class="warning-box">No guide pair satisfies the selected RTT, overlap, and PBS constraints. Try widening the wiggle room or shortening the overlap.</div>`;
+    return { html: `${caption}<div class="warning-box">No guide pair satisfies the selected RTT, overlap, and PBS constraints. Try widening the wiggle room or shortening the overlap.</div>`, download: null };
   }
 
   const selections = selectSynergisticDesigns({
@@ -182,7 +199,7 @@ function renderMain(record, pairs, state) {
   });
 
   if (!selections.length) {
-    return `${caption}<div class="warning-box">No feasible pair contributes coverage to the target.</div>`;
+    return { html: `${caption}<div class="warning-box">No feasible pair contributes coverage to the target.</div>`, download: null };
   }
 
   const cumulativeCoverage = selections[selections.length - 1].cumulativeCoveragePercent;
@@ -209,11 +226,23 @@ function renderMain(record, pairs, state) {
     coveragePercent: cumulativeCoverage,
   });
 
+  const csvRows = [];
+
   const cardsHtml = selections
     .map((selection, i) => {
       const assembled = assembledByDesign.get(selection.design);
+      const setNumber = i + 1;
+      const extra = {
+        set: setNumber,
+        new_bases: selection.marginalCoveredLength,
+        cumulative_coverage_percent: selection.cumulativeCoveragePercent.toFixed(1),
+        overlap_length_nt: selection.design.plan.overlapLength,
+      };
+      csvRows.push(pegrnaSideRow(extra, "Left", assembled.left));
+      csvRows.push(pegrnaSideRow(extra, "Right", assembled.right));
+
       return buildPegrnaCardHtml({
-        setNumber: i + 1,
+        setNumber,
         headerRight: [
           { label: "New bases", value: String(selection.marginalCoveredLength) },
           { label: "Cumulative", value: `${selection.cumulativeCoveragePercent.toFixed(1)}%`, teal: true },
@@ -247,7 +276,13 @@ function renderMain(record, pairs, state) {
     })
     .join("");
 
-  return `
+  const download = {
+    filename: `errpresso_joint-coverage_${slugify(record.recordId)}.csv`,
+    rows: csvRows,
+    columns: CSV_COLUMNS,
+  };
+
+  const html = `
     <div class="label">Joint coverage map</div>
     ${mapHtml}
 
@@ -259,11 +294,16 @@ function renderMain(record, pairs, state) {
 
     <div style="display: flex; align-items: center; justify-content: space-between;">
       <div class="label">Designs</div>
-      ${buildPegrnaLegendHtml()}
+      <div style="display: flex; align-items: center; gap: 16px;">
+        ${buildPegrnaLegendHtml()}
+        ${downloadCsvButtonHtml("download-csv-btn")}
+      </div>
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 14px;">
       ${cardsHtml}
     </div>
   `;
+
+  return { html, download };
 }

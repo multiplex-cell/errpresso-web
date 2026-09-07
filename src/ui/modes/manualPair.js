@@ -7,6 +7,15 @@ import { stepperFieldHtml, attachStepperField, toggleHtml, attachToggle } from "
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
 import { ICONS } from "../icons.js";
+import {
+  slugify,
+  pegrnaSideRow,
+  PEGRNA_BASE_COLUMNS,
+  downloadCsvButtonHtml,
+  wireDownloadButton,
+} from "../csvExport.js";
+
+const CSV_COLUMNS = [...PEGRNA_BASE_COLUMNS, { key: "overlap_length_nt", label: "overlap_length_nt" }];
 
 function defaults(record) {
   return {
@@ -51,7 +60,9 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
   const rightGuides = guides.filter((g) => g.strand === "-").sort((a, b) => b.nickPosition - a.nickPosition);
 
   function recompute() {
-    mainContent.innerHTML = renderMain(record, leftGuides, rightGuides, state);
+    const { html, download } = renderMain(record, leftGuides, rightGuides, state);
+    mainContent.innerHTML = html;
+    wireDownloadButton(mainContent, download);
     attachPickerListeners();
   }
 
@@ -133,17 +144,20 @@ function renderMain(record, leftGuides, rightGuides, state) {
     );
 
   if (state.leftIndex === null || state.rightIndex === null) {
-    return fillPreview('<div class="caption" style="text-align:center;">Pick one guide on the left and one on the right.</div>');
+    return { html: fillPreview('<div class="caption" style="text-align:center;">Pick one guide on the left and one on the right.</div>'), download: null };
   }
 
   const left = leftGuides[state.leftIndex];
   const right = rightGuides[state.rightIndex];
 
   if (left.nickPosition >= right.nickPosition) {
-    return `
+    return {
+      html: `
       ${fillPreview('<div class="caption" style="text-align:center;color:var(--danger);">Not an inward-facing pair.</div>')}
       <div class="warning-box">The picked '+' guide isn't to the left of the picked '-' guide, so they can't form an inward-facing pair.</div>
-    `;
+    `,
+      download: null,
+    };
   }
 
   const pair = makePair(left, right);
@@ -198,11 +212,24 @@ function renderMain(record, leftGuides, rightGuides, state) {
       })
     : `<div class="warning-box">${error.message}</div>`;
 
+  let download = null;
+
   const resultHtml = design
-    ? `
+    ? (() => {
+        const extra = { overlap_length_nt: design.plan.overlapLength };
+        download = {
+          filename: `errpresso_manual-pair_${slugify(record.recordId)}.csv`,
+          rows: [pegrnaSideRow(extra, "Left", design.left), pegrnaSideRow(extra, "Right", design.right)],
+          columns: CSV_COLUMNS,
+        };
+
+        return `
       <div style="display: flex; align-items: center; justify-content: space-between;">
         <div class="label">Paired pegRNA design</div>
-        ${buildPegrnaLegendHtml()}
+        <div style="display: flex; align-items: center; gap: 16px;">
+          ${buildPegrnaLegendHtml()}
+          ${downloadCsvButtonHtml("download-csv-btn")}
+        </div>
       </div>
       ${design.plan.overlapLength === nickDistance ? '<div class="warning-box">The overlap covers the entire interval between the nick sites.</div>' : ""}
       ${Math.max(design.left.rttLength, design.right.rttLength) > 80 ? '<div class="warning-box">At least one RTT is longer than 80 nt. Long RTT designs may require additional experimental validation.</div>' : ""}
@@ -235,12 +262,16 @@ function renderMain(record, leftGuides, rightGuides, state) {
         ],
         footnote: `Nick interval ${pair.leftGuide.nickPosition}–${pair.rightGuide.nickPosition} · overlap ${design.plan.overlapStart}–${design.plan.overlapEnd}`,
       })}
-    `
+    `;
+      })()
     : "";
 
-  return `
+  return {
+    html: `
     ${fillPreview(previewHtml)}
     ${overlapStartField}
     ${resultHtml}
-  `;
+  `,
+    download,
+  };
 }

@@ -23,6 +23,8 @@ export const ICONS = {
     '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l7 3v5c0 4.5-3 7.5-7 8-4-0.5-7-3.5-7-8V5Z"></path><path d="M7 10l2 2 4-4"></path></svg>',
   chevronDown:
     '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"></path></svg>',
+  download:
+    '<svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10"></path><path d="M6 9l4 4 4-4"></path><path d="M4 15v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"></path></svg>',
 };
 
 export function logoMarkSvg(size = 26) {

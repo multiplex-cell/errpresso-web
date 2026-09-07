@@ -55,7 +55,8 @@ tests/               node:test unit tests for src/core/
 ## Status
 
 Guide discovery, pairing, RTT/PBS design, and all four design modes are
-implemented and tested against the Python original's test suite. Fetch-by-gene
+implemented and tested against the Python original's test suite. Every mode's
+results can be exported as a CSV of the underlying pegRNA designs. Fetch-by-gene
 (UCSC) is not yet wired up in this version -- paste or upload a sequence
 directly for now.
 

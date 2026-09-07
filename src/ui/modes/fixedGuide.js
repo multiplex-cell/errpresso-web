@@ -8,6 +8,21 @@ import { stepperFieldHtml, attachStepperField, singleSliderHtml, attachSingleSli
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
 import { escapeHtml } from "../domUtils.js";
+import {
+  slugify,
+  pegrnaSideRow,
+  PEGRNA_BASE_COLUMNS,
+  downloadCsvButtonHtml,
+  wireDownloadButton,
+} from "../csvExport.js";
+
+const CSV_COLUMNS = [
+  { key: "set", label: "set" },
+  { key: "fixed", label: "fixed" },
+  ...PEGRNA_BASE_COLUMNS,
+  { key: "nick_distance", label: "nick_distance" },
+  { key: "overlap_length_nt", label: "overlap_length_nt" },
+];
 
 function defaults() {
   return { fixedGuideIndex: 0, pairCount: 5, overlapLength: 30, pbs: 13 };
@@ -85,7 +100,9 @@ export function renderFixedGuideMode({ record, guides, state, sidebarExtra, main
   renderPartnerControls();
 
   function recompute() {
-    mainContent.innerHTML = renderMain(record, guides, state);
+    const { html, download } = renderMain(record, guides, state);
+    mainContent.innerHTML = html;
+    wireDownloadButton(mainContent, download);
   }
 
   recompute();
@@ -96,13 +113,13 @@ function renderMain(record, guides, state) {
   const compatiblePairs = findPairsForFixedGuide(guides, fixedGuide);
 
   if (!compatiblePairs.length) {
-    return `<div class="warning-box">No inward-facing opposite-strand partner was found.</div>`;
+    return { html: `<div class="warning-box">No inward-facing opposite-strand partner was found.</div>`, download: null };
   }
 
   const overlapCompatible = compatiblePairs.filter((p) => p.nickDistance >= state.overlapLength);
 
   if (!overlapCompatible.length) {
-    return `<div class="warning-box">No partner pair is long enough for this overlap.</div>`;
+    return { html: `<div class="warning-box">No partner pair is long enough for this overlap.</div>`, download: null };
   }
 
   const selectedPairs = selectSpanningPairs(overlapCompatible, state.pairCount);
@@ -119,7 +136,7 @@ function renderMain(record, guides, state) {
   }
 
   if (!designs.length) {
-    return `<div class="warning-box">No selected pair supports the requested PBS and overlap.</div>`;
+    return { html: `<div class="warning-box">No selected pair supports the requested PBS and overlap.</div>`, download: null };
   }
 
   const rows = designs.map((d, i) => ({
@@ -152,11 +169,22 @@ function renderMain(record, guides, state) {
     coveragePercent,
   });
 
+  const csvRows = [];
+
   const cardsHtml = designs
     .map((d, i) => {
       const fixedSide = d.left.guide === fixedGuide ? "Left" : "Right";
+      const setNumber = i + 1;
+      const extra = {
+        set: setNumber,
+        nick_distance: d.pair.nickDistance,
+        overlap_length_nt: d.plan.overlapLength,
+      };
+      csvRows.push(pegrnaSideRow({ ...extra, fixed: fixedSide === "Left" ? "yes" : "no" }, "Left", d.left));
+      csvRows.push(pegrnaSideRow({ ...extra, fixed: fixedSide === "Right" ? "yes" : "no" }, "Right", d.right));
+
       return buildPegrnaCardHtml({
-        setNumber: i + 1,
+        setNumber,
         headerRight: [
           { label: "Nick distance", value: String(d.pair.nickDistance) },
           { label: "Overlap", value: `${d.plan.overlapLength} nt` },
@@ -191,7 +219,13 @@ function renderMain(record, guides, state) {
     })
     .join("");
 
-  return `
+  const download = {
+    filename: `errpresso_fixed-guide_${slugify(record.recordId)}.csv`,
+    rows: csvRows,
+    columns: CSV_COLUMNS,
+  };
+
+  const html = `
     <div class="label">Variable-reach map</div>
     ${mapHtml}
     <div class="stat-grid">
@@ -202,7 +236,10 @@ function renderMain(record, guides, state) {
 
     <div style="display: flex; align-items: center; justify-content: space-between;">
       <div class="label">Designs</div>
-      ${buildPegrnaLegendHtml()}
+      <div style="display: flex; align-items: center; gap: 16px;">
+        ${buildPegrnaLegendHtml()}
+        ${downloadCsvButtonHtml("download-csv-btn")}
+      </div>
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 14px;">
@@ -211,4 +248,6 @@ function renderMain(record, guides, state) {
 
     <div class="caption">The preferred RTT-size window is ignored in this mode; every design uses exactly the chosen overlap length.</div>
   `;
+
+  return { html, download };
 }
