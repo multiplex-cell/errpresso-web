@@ -25,7 +25,6 @@ function defaults(record) {
     wiggle: Math.min(20, record.length || 1),
     pbs: 13,
     maxDesigns: 5,
-    requireCoverage: false,
     forceMax: false,
   };
 }
@@ -65,12 +64,11 @@ export function renderSinglePegrnaMode({ record, guides, state, sidebarExtra, ma
     </div>
 
     <div style="display:flex;flex-direction:column;gap:14px;">
-      ${toggleHtml({ id: "requireCoverage", label: "Require complete target coverage", checked: state.requireCoverage })}
       ${toggleHtml({
         id: "forceMax",
         label: "Always fill to the maximum guide count",
         checked: state.forceMax,
-        help: "Include extra backup guides even once additional guides stop adding new target coverage.",
+        help: "Adds backup guides once coverage stops improving.",
       })}
     </div>
   `;
@@ -94,10 +92,6 @@ export function renderSinglePegrnaMode({ record, guides, state, sidebarExtra, ma
   });
   attachSingleSlider(sidebarExtra, "maxDesigns", (v) => {
     state.maxDesigns = v;
-    recompute();
-  });
-  attachToggle(sidebarExtra, "requireCoverage", (v) => {
-    state.requireCoverage = v;
     recompute();
   });
   attachToggle(sidebarExtra, "forceMax", (v) => {
@@ -164,10 +158,6 @@ function renderMain(record, guides, state) {
   }
 
   const cumulativeCoverage = selections[selections.length - 1].cumulativeCoveragePercent;
-
-  if (state.requireCoverage && cumulativeCoverage < 100.0) {
-    return `${caption}<div class="warning-box">No set of up to ${state.maxDesigns} feasible guides completely covers the selected target with the current RTT constraints.</div>`;
-  }
 
   const rows = selections.map((selection, i) => ({
     label: `Guide ${i + 1}`,

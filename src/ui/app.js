@@ -58,7 +58,7 @@ function renderLanding() {
             ${logoMarkSvg(34)}
             <span style="font-size:22px;font-weight:700;letter-spacing:-0.01em;">ErrPresso</span>
           </div>
-          <div style="font-size:15px;color:var(--text-muted);text-align:center;">Paired prime-editing design, right in your browser</div>
+          <div style="font-size:15px;color:var(--text-muted);text-align:center;">Err2 prime-editing design</div>
         </div>
 
         <div class="landing-card">
@@ -76,12 +76,6 @@ function renderLanding() {
             <button class="btn btn-primary" id="design-btn" style="flex:1;">Design pegRNAs ${ICONS.arrowRight}</button>
             <button class="btn btn-ghost" id="load-example-btn">Load example</button>
           </div>
-        </div>
-
-        <div class="trust-line">${ICONS.shield} Runs entirely in your browser -- no server round-trip, no account</div>
-
-        <div class="mode-preview-strip">
-          ${MODES.map((m) => `<div class="pill-static">${m.label}</div>`).join("")}
         </div>
       </div>
     </div>

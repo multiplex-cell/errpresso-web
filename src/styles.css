@@ -615,31 +615,6 @@ details.guide-details .data-table-wrap {
   flex-direction: column;
   gap: 20px;
 }
-.trust-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-faint);
-}
-.mode-preview-strip {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.pill-static {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 13px;
-  color: var(--text-muted);
-  background: var(--surface);
-}
-
 @media (max-width: 900px) {
   .sidebar {
     width: 100%;
