@@ -163,6 +163,9 @@ function renderMain(record, guides, state) {
     label: `Guide ${i + 1}`,
     start: selection.design.coverage.guideIntervalStart,
     end: selection.design.coverage.guideIntervalEnd,
+    // Only one edge is a true nick site -- the '+' strand's guide nicks
+    // at its left edge and synthesizes rightward; '-' is the mirror.
+    nickEdge: selection.design.guide.strand === "+" ? "left" : "right",
   }));
 
   const coveredIntervals = selections.map((s) => [

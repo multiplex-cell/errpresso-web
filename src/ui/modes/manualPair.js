@@ -186,7 +186,7 @@ function renderMain(record, leftGuides, rightGuides, state) {
         targetEnd: record.length,
         rows: [
           {
-            label: "",
+            label: "1",
             start: pair.betweenNicksStart,
             end: pair.betweenNicksEnd,
             overlapStart: design.plan.overlapStart,
