@@ -4,8 +4,13 @@ import { planWildTypeOverlap } from "./rttPlan.js";
 import { designWildTypeRtts } from "./rttDesign.js";
 import { designPairedPbs } from "./pbsDesign.js";
 
+// Standard SpCas9 sgRNA scaffold (5' to 3' DNA), constant across every
+// design -- there's no per-guide variation, so it lives here once.
+export const SCAFFOLD_SEQUENCE =
+  "GTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGC";
+
 /**
- * One pegRNA's components. Sequences are 5' to 3' DNA; no scaffold.
+ * One pegRNA's components. Sequences are 5' to 3' DNA.
  *
  * @typedef {Object} PegRNADesign
  * @property {GuideCandidate} guide
@@ -13,15 +18,19 @@ import { designPairedPbs } from "./pbsDesign.js";
  * @property {string} pbsSequence
  * @property {string} spacerSequence
  * @property {string} extensionSequence
+ * @property {string} fullSequence -- spacer + scaffold + RTT + PBS
  * @property {string} spacerRna
  * @property {string} extensionRna
+ * @property {string} fullRna
  * @property {number} rttLength
  * @property {number} pbsLength
  * @property {number} extensionLength
+ * @property {number} fullLength
  */
 
 export function makePegRnaDesign(guide, rttSequence, pbsSequence) {
   const extensionSequence = rttSequence + pbsSequence;
+  const fullSequence = guide.spacer + SCAFFOLD_SEQUENCE + extensionSequence;
 
   return Object.freeze({
     guide,
@@ -29,11 +38,14 @@ export function makePegRnaDesign(guide, rttSequence, pbsSequence) {
     pbsSequence,
     spacerSequence: guide.spacer,
     extensionSequence,
+    fullSequence,
     spacerRna: guide.spacer.replace(/T/g, "U"),
     extensionRna: extensionSequence.replace(/T/g, "U"),
+    fullRna: fullSequence.replace(/T/g, "U"),
     rttLength: rttSequence.length,
     pbsLength: pbsSequence.length,
     extensionLength: extensionSequence.length,
+    fullLength: fullSequence.length,
   });
 }
 

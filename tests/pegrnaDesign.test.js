@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 
 import { findSpCas9Guides } from "../src/core/guides.js";
 import { findInwardFacingPairs } from "../src/core/pairs.js";
-import { designPairedPegrnas } from "../src/core/pegrnaDesign.js";
+import { designPairedPegrnas, SCAFFOLD_SEQUENCE } from "../src/core/pegrnaDesign.js";
 
 const EXAMPLE_SEQUENCE =
   "TTATATTCCACTGCTTCTCAGGGATTAACATCTGCTCGTGCAGCTGAGATCCTGGCGCGAGAT" +
@@ -85,4 +85,16 @@ test("overlap information is preserved", () => {
   assert.equal(design.plan.overlapEnd, 58);
   assert.equal(design.overlapPlusStrand, "TGCAGCTGAGATCCTGGCGC");
   assert.equal(design.overlapMinusStrand, "GCGCCAGGATCTCAGCTGCA");
+});
+
+test("full pegRNA sequence is spacer + scaffold + RTT + PBS", () => {
+  const design = makeDesign();
+
+  assert.equal(
+    design.left.fullSequence,
+    design.left.spacerSequence + SCAFFOLD_SEQUENCE + design.left.rttSequence + design.left.pbsSequence
+  );
+  assert.equal(design.left.fullLength, design.left.fullSequence.length);
+  assert.ok(!design.left.fullRna.includes("T"));
+  assert.equal(design.left.fullRna.length, design.left.fullSequence.length);
 });

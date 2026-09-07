@@ -6,7 +6,7 @@ import { designPairedPegrnas } from "../../core/pegrnaDesign.js";
 import { SequenceParseError } from "../../core/sequenceIo.js";
 import { stepperFieldHtml, attachStepperField, singleSliderHtml, attachSingleSlider } from "../controls.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
-import { truncateSeq, escapeHtml } from "../domUtils.js";
+import { escapeHtml } from "../domUtils.js";
 
 function defaults() {
   return { fixedGuideIndex: 0, pairCount: 5, overlapLength: 30, pbs: 13 };
@@ -158,12 +158,14 @@ function renderMain(record, guides, state) {
         <tr>
           <td>${i + 1}</td>
           <td>${fixedSide}</td>
-          <td class="seq">${truncateSeq(d.left.spacerSequence)}</td>
-          <td class="seq">${truncateSeq(d.left.rttSequence)}</td>
-          <td class="seq">${truncateSeq(d.left.pbsSequence)}</td>
-          <td class="seq">${truncateSeq(d.right.spacerSequence)}</td>
-          <td class="seq">${truncateSeq(d.right.rttSequence)}</td>
-          <td class="seq">${truncateSeq(d.right.pbsSequence)}</td>
+          <td class="seq">${d.left.spacerSequence}</td>
+          <td class="seq">${d.left.rttSequence}</td>
+          <td class="seq">${d.left.pbsSequence}</td>
+          <td class="seq">${d.left.fullSequence}</td>
+          <td class="seq">${d.right.spacerSequence}</td>
+          <td class="seq">${d.right.rttSequence}</td>
+          <td class="seq">${d.right.pbsSequence}</td>
+          <td class="seq">${d.right.fullSequence}</td>
           <td class="num">${d.pair.nickDistance}</td>
           <td class="num">${d.plan.overlapLength}</td>
         </tr>`;
@@ -181,8 +183,8 @@ function renderMain(record, guides, state) {
     <div class="data-table-wrap">
       <table class="data-table">
         <thead><tr>
-          <th>Order</th><th>Fixed side</th><th>Left spacer</th><th>Left RTT</th><th>Left PBS</th>
-          <th>Right spacer</th><th>Right RTT</th><th>Right PBS</th><th class="num">Nick distance</th><th class="num">Overlap</th>
+          <th>Order</th><th>Fixed side</th><th>Left spacer</th><th>Left RTT</th><th>Left PBS</th><th>Left pegRNA</th>
+          <th>Right spacer</th><th>Right RTT</th><th>Right PBS</th><th>Right pegRNA</th><th class="num">Nick distance</th><th class="num">Overlap</th>
         </tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>

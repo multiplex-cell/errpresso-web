@@ -6,7 +6,6 @@ import { designPairedPegrnas } from "../../core/pegrnaDesign.js";
 import { stepperFieldHtml, attachStepperField, toggleHtml, attachToggle } from "../controls.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { ICONS } from "../icons.js";
-import { truncateSeq } from "../domUtils.js";
 
 function defaults(record) {
   return {
@@ -207,15 +206,15 @@ function renderMain(record, leftGuides, rightGuides, state) {
       <div class="data-table-wrap">
         <table class="data-table">
           <thead><tr>
-            <th>Left spacer</th><th>Left PAM</th><th class="num">Left Nick</th><th>Left RTT</th><th>Left PBS</th>
-            <th>Right spacer</th><th>Right PAM</th><th class="num">Right Nick</th><th>Right RTT</th><th>Right PBS</th><th class="num">Overlap</th>
+            <th>Left spacer</th><th>Left PAM</th><th class="num">Left Nick</th><th>Left RTT</th><th>Left PBS</th><th>Left pegRNA</th>
+            <th>Right spacer</th><th>Right PAM</th><th class="num">Right Nick</th><th>Right RTT</th><th>Right PBS</th><th>Right pegRNA</th><th class="num">Overlap</th>
           </tr></thead>
           <tbody>
             <tr>
-              <td class="seq">${truncateSeq(design.left.spacerSequence)}</td><td class="seq">${design.left.guide.pam}</td><td class="num">${design.left.guide.nickPosition}</td>
-              <td class="seq">${truncateSeq(design.left.rttSequence)}</td><td class="seq">${truncateSeq(design.left.pbsSequence)}</td>
-              <td class="seq">${truncateSeq(design.right.spacerSequence)}</td><td class="seq">${design.right.guide.pam}</td><td class="num">${design.right.guide.nickPosition}</td>
-              <td class="seq">${truncateSeq(design.right.rttSequence)}</td><td class="seq">${truncateSeq(design.right.pbsSequence)}</td><td class="num">${design.plan.overlapLength}</td>
+              <td class="seq">${design.left.spacerSequence}</td><td class="seq">${design.left.guide.pam}</td><td class="num">${design.left.guide.nickPosition}</td>
+              <td class="seq">${design.left.rttSequence}</td><td class="seq">${design.left.pbsSequence}</td><td class="seq">${design.left.fullSequence}</td>
+              <td class="seq">${design.right.spacerSequence}</td><td class="seq">${design.right.guide.pam}</td><td class="num">${design.right.guide.nickPosition}</td>
+              <td class="seq">${design.right.rttSequence}</td><td class="seq">${design.right.pbsSequence}</td><td class="seq">${design.right.fullSequence}</td><td class="num">${design.plan.overlapLength}</td>
             </tr>
           </tbody>
         </table>

@@ -15,7 +15,6 @@ import {
   attachDualSlider,
 } from "../controls.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
-import { truncateSeq } from "../domUtils.js";
 
 function defaults(record) {
   return {
@@ -190,11 +189,12 @@ function renderMain(record, guides, state) {
         <tr>
           <td>${i + 1}</td>
           <td>${guide.strand}</td>
-          <td class="seq">${truncateSeq(assembled.spacerSequence)}</td>
+          <td class="seq">${assembled.spacerSequence}</td>
           <td class="seq">${guide.pam}</td>
           <td class="num">${guide.nickPosition}</td>
-          <td class="seq">${truncateSeq(assembled.rttSequence)}</td>
-          <td class="seq">${truncateSeq(assembled.pbsSequence)}</td>
+          <td class="seq">${assembled.rttSequence}</td>
+          <td class="seq">${assembled.pbsSequence}</td>
+          <td class="seq">${assembled.fullSequence}</td>
           <td class="num">${selection.marginalCoveredLength}</td>
           <td class="num cumulative">${selection.cumulativeCoveragePercent.toFixed(1)}%</td>
         </tr>`;
@@ -215,7 +215,7 @@ function renderMain(record, guides, state) {
       <table class="data-table">
         <thead><tr>
           <th>Set</th><th>Strand</th><th>Spacer</th><th>PAM</th><th class="num">Nick</th>
-          <th>RTT</th><th>PBS</th><th class="num">New bases</th><th class="num">Cumulative</th>
+          <th>RTT</th><th>PBS</th><th>pegRNA</th><th class="num">New bases</th><th class="num">Cumulative</th>
         </tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>

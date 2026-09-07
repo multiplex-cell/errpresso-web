@@ -21,9 +21,9 @@ function rowNumber(label) {
 function nickMarker(edge) {
   const common = "position:absolute;top:50%;transform:translateY(-50%);width:0;height:0;";
   if (edge === "left") {
-    return `<div style="${common}left:-1px;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:5px solid var(--accent);"></div>`;
+    return `<div style="${common}left:-1px;border-top:3px solid transparent;border-bottom:3px solid transparent;border-left:4px solid var(--accent);"></div>`;
   }
-  return `<div style="${common}right:-1px;border-top:4px solid transparent;border-bottom:4px solid transparent;border-right:5px solid var(--accent);"></div>`;
+  return `<div style="${common}right:-1px;border-top:3px solid transparent;border-bottom:3px solid transparent;border-right:4px solid var(--accent);"></div>`;
 }
 
 // Plain end-cap for a non-nick edge (e.g. where a single guide's RTT
@@ -81,9 +81,9 @@ export function buildCoverageMapHtml({
         (nickEdge === "right" || nickEdge === "both" ? nickMarker("right") : endCap("right"));
 
       return `
-        <div style="display:flex;align-items:center;gap:10px;height:18px;">
-          <span class="mono" style="width:${GUTTER - 10}px;flex-shrink:0;display:flex;align-items:center;justify-content:center;height:16px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:10px;font-weight:700;">${rowNumber(row.label)}</span>
-          <div style="position:relative;flex:1;height:12px;">
+        <div style="display:flex;align-items:center;gap:10px;height:14px;">
+          <span class="mono" style="width:${GUTTER - 10}px;flex-shrink:0;display:flex;align-items:center;justify-content:center;height:13px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:9px;font-weight:700;">${rowNumber(row.label)}</span>
+          <div style="position:relative;flex:1;height:8px;">
             <div style="position:absolute;left:${left}%;width:${width}%;top:0;bottom:0;border-radius:999px;background:var(--accent-soft);border:1px solid var(--accent-line);box-shadow:0 1px 2px oklch(0% 0 0 / 0.05);"></div>
             <div style="position:absolute;left:${left}%;width:${width}%;top:0;bottom:0;">${markers}</div>
             ${overlapHtml}
@@ -121,49 +121,49 @@ export function buildCoverageMapHtml({
     .join("");
 
   return `
-    <div class="panel" style="padding:20px 24px 16px;">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;">
+    <div class="panel" style="padding:16px 22px 12px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
         <div class="label">Coverage track</div>
         <div style="display:flex;align-items:baseline;gap:6px;">
-          <span style="font-size:22px;font-weight:700;color:var(--teal);letter-spacing:-0.01em;">${coveragePercent.toFixed(1)}%</span>
-          <span style="font-size:12px;color:var(--text-faint);">of target</span>
+          <span style="font-size:20px;font-weight:700;color:var(--teal);letter-spacing:-0.01em;">${coveragePercent.toFixed(1)}%</span>
+          <span style="font-size:11.5px;color:var(--text-faint);">of target</span>
         </div>
       </div>
 
       <div style="position:relative;">
-        <div style="position:absolute;left:${GUTTER}px;right:0;top:0;bottom:18px;">
+        <div style="position:absolute;left:${GUTTER}px;right:0;top:0;bottom:15px;">
           ${gridlinesHtml}
           <div style="position:absolute;top:0;bottom:0;left:${targetLeft}%;width:${Math.max(0.2, targetRight - targetLeft)}%;background:var(--accent-soft);opacity:0.35;"></div>
         </div>
 
-        <div style="position:relative;display:flex;flex-direction:column;gap:4px;">
+        <div style="position:relative;display:flex;flex-direction:column;gap:3px;">
           ${rowsHtml}
 
-          <div style="height:1px;background:var(--border-soft);margin:6px 0 6px ${GUTTER}px;"></div>
+          <div style="height:1px;background:var(--border-soft);margin:5px 0 5px ${GUTTER}px;"></div>
 
-          <div style="display:flex;align-items:center;gap:10px;height:12px;">
-            <span style="width:${GUTTER - 10}px;font-size:10.5px;color:var(--text-faint);flex-shrink:0;text-align:center;">Target</span>
-            <div style="position:relative;flex:1;height:7px;">
-              <div style="position:absolute;left:${targetLeft}%;right:${100 - targetRight}%;top:3px;height:1.5px;background:var(--text-muted);"></div>
-              <div style="position:absolute;left:${targetLeft}%;top:0;width:2px;height:7px;background:var(--text-muted);"></div>
-              <div style="position:absolute;right:${100 - targetRight}%;top:0;width:2px;height:7px;background:var(--text-muted);"></div>
+          <div style="display:flex;align-items:center;gap:10px;height:10px;">
+            <span style="width:${GUTTER - 10}px;font-size:10px;color:var(--text-faint);flex-shrink:0;text-align:center;">Target</span>
+            <div style="position:relative;flex:1;height:6px;">
+              <div style="position:absolute;left:${targetLeft}%;right:${100 - targetRight}%;top:2.5px;height:1.5px;background:var(--text-muted);"></div>
+              <div style="position:absolute;left:${targetLeft}%;top:0;width:2px;height:6px;background:var(--text-muted);"></div>
+              <div style="position:absolute;right:${100 - targetRight}%;top:0;width:2px;height:6px;background:var(--text-muted);"></div>
             </div>
           </div>
 
-          <div style="display:flex;align-items:center;gap:10px;height:11px;">
-            <span style="width:${GUTTER - 10}px;font-size:10.5px;color:var(--text-faint);flex-shrink:0;text-align:center;">Covered</span>
-            <div style="position:relative;flex:1;height:11px;border-radius:999px;background:var(--border-soft);">
+          <div style="display:flex;align-items:center;gap:10px;height:8px;">
+            <span style="width:${GUTTER - 10}px;font-size:10px;color:var(--text-faint);flex-shrink:0;text-align:center;">Covered</span>
+            <div style="position:relative;flex:1;height:8px;border-radius:999px;background:var(--border-soft);">
               ${coveredHtml}
             </div>
           </div>
 
-          <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-top:3px;">
             <span style="width:${GUTTER - 10}px;flex-shrink:0;"></span>
-            <div style="position:relative;flex:1;height:14px;">
+            <div style="position:relative;flex:1;height:12px;">
               ${ticks
                 .map(
                   (t) =>
-                    `<span class="mono" style="position:absolute;${tickLabelStyle(t)}font-size:10.5px;color:var(--text-faint);">${t.label}</span>`
+                    `<span class="mono" style="position:absolute;${tickLabelStyle(t)}font-size:10px;color:var(--text-faint);">${t.label}</span>`
                 )
                 .join("")}
             </div>
@@ -171,7 +171,7 @@ export function buildCoverageMapHtml({
         </div>
       </div>
 
-      <div style="display:flex;align-items:center;gap:20px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border-soft);">
+      <div style="display:flex;align-items:center;gap:20px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-soft);">
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:8px;border-radius:3px;background:var(--accent-soft);border:1px solid var(--accent-line);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">nick span</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:8px;border-radius:3px;background:var(--teal);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">overlap / covered</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:5px solid var(--accent);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">nick site</span></div>

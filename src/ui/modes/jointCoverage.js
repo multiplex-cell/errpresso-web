@@ -16,7 +16,6 @@ import {
   attachDualSlider,
 } from "../controls.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
-import { truncateSeq } from "../domUtils.js";
 
 function defaults(record) {
   return {
@@ -215,12 +214,14 @@ function renderMain(record, pairs, state) {
       return `
         <tr>
           <td>${i + 1}</td>
-          <td class="seq">${truncateSeq(assembled.left.spacerSequence)}</td>
-          <td class="seq">${truncateSeq(assembled.left.rttSequence)}</td>
-          <td class="seq">${truncateSeq(assembled.left.pbsSequence)}</td>
-          <td class="seq">${truncateSeq(assembled.right.spacerSequence)}</td>
-          <td class="seq">${truncateSeq(assembled.right.rttSequence)}</td>
-          <td class="seq">${truncateSeq(assembled.right.pbsSequence)}</td>
+          <td class="seq">${assembled.left.spacerSequence}</td>
+          <td class="seq">${assembled.left.rttSequence}</td>
+          <td class="seq">${assembled.left.pbsSequence}</td>
+          <td class="seq">${assembled.left.fullSequence}</td>
+          <td class="seq">${assembled.right.spacerSequence}</td>
+          <td class="seq">${assembled.right.rttSequence}</td>
+          <td class="seq">${assembled.right.pbsSequence}</td>
+          <td class="seq">${assembled.right.fullSequence}</td>
           <td class="num">${selection.marginalCoveredLength}</td>
           <td class="num cumulative">${selection.cumulativeCoveragePercent.toFixed(1)}%</td>
           <td class="num">${selection.design.plan.overlapLength}</td>
@@ -241,8 +242,8 @@ function renderMain(record, pairs, state) {
     <div class="data-table-wrap">
       <table class="data-table">
         <thead><tr>
-          <th>Set</th><th>Left spacer</th><th>Left RTT</th><th>Left PBS</th>
-          <th>Right spacer</th><th>Right RTT</th><th>Right PBS</th>
+          <th>Set</th><th>Left spacer</th><th>Left RTT</th><th>Left PBS</th><th>Left pegRNA</th>
+          <th>Right spacer</th><th>Right RTT</th><th>Right PBS</th><th>Right pegRNA</th>
           <th class="num">New bases</th><th class="num">Cumulative</th><th class="num">Overlap</th>
         </tr></thead>
         <tbody>${rowsHtml}</tbody>
