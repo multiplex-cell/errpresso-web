@@ -50,9 +50,9 @@ export function renderGeneFetchPanel(container, state, rerender, onFetched) {
   container.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px;padding:2px 0 4px;">
       <div class="caption">Pick a gene from the list, or type one and look it up directly. Fetches only the exon and flanking sequence you request from the UCSC Genome Browser (hg38).</div>
-      <div style="position:relative;display:flex;gap:10px;">
-        <input type="text" id="gene-symbol-input" class="field" style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:13px;" placeholder="Gene symbol, e.g. BRCA2" value="${escapeHtml(state.symbol)}" autocomplete="off">
-        <button class="btn btn-primary" id="gene-lookup-btn" ${state.lookupLoading ? "disabled" : ""}>${state.lookupLoading ? "Looking up…" : "Look up gene"}</button>
+      <div style="position:relative;display:flex;gap:10px;flex-wrap:wrap;">
+        <input type="text" id="gene-symbol-input" class="field" style="flex:1 1 160px;font-family:'IBM Plex Mono',monospace;font-size:13px;" placeholder="Gene symbol, e.g. BRCA2" value="${escapeHtml(state.symbol)}" autocomplete="off">
+        <button class="btn btn-primary" id="gene-lookup-btn" style="flex:0 0 auto;" ${state.lookupLoading ? "disabled" : ""}>${state.lookupLoading ? "Looking up…" : "Look up gene"}</button>
         <div id="gene-suggestions" class="gene-suggest-panel" hidden></div>
       </div>
       ${state.lookupError ? `<div class="warning-box">${escapeHtml(state.lookupError)}</div>` : ""}
@@ -222,16 +222,16 @@ function structureStageHtml(state) {
     <div style="border-top:1px solid var(--border-soft);padding-top:14px;display:flex;flex-direction:column;gap:14px;">
       <div class="caption"><strong style="color:var(--text);">${escapeHtml(structure.geneSymbol)}</strong> — ${escapeHtml(structure.chrom)} (${structure.strand} strand) · ${escapeHtml(structure.transcriptId)} · ${escapeHtml(structure.transcriptSource)} · ${structure.exons.length} exon${structure.exons.length === 1 ? "" : "s"}</div>
 
-      <div style="display:flex;gap:10px;">
-        <div style="flex:1;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1 1 120px;">
           <div class="field-label">Exon</div>
           <select id="gene-exon-select" class="field" style="width:100%;">${exonOptions}</select>
         </div>
-        <div style="flex:1;">
+        <div style="flex:1 1 120px;">
           <div class="field-label">Upstream flank (nt)</div>
           <input type="number" id="gene-upstream-input" class="field" style="width:100%;" min="0" max="5000" step="10" value="${state.upstream}">
         </div>
-        <div style="flex:1;">
+        <div style="flex:1 1 120px;">
           <div class="field-label">Downstream flank (nt)</div>
           <input type="number" id="gene-downstream-input" class="field" style="width:100%;" min="0" max="5000" step="10" value="${state.downstream}">
         </div>

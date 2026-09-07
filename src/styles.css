@@ -665,3 +665,65 @@ details.guide-details .data-table-wrap {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 640px) {
+  .topbar {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .main-content {
+    padding: 20px 16px;
+  }
+  .sidebar {
+    padding: 16px 12px;
+  }
+  .chip-row {
+    flex-wrap: wrap;
+  }
+
+  .landing-wrap {
+    padding: 40px 14px;
+  }
+  .landing-card {
+    padding: 18px;
+  }
+  .tab-row {
+    width: 100%;
+  }
+  .tab-item {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 6px;
+    font-size: 12.5px;
+  }
+
+  /* Card sides (Left/Right pegRNA) stack instead of sitting side by side --
+     two ~half-width columns is too cramped for a wrapped sequence block. */
+  .pegrna-sides-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .pegrna-side-divider {
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-soft) !important;
+    padding-right: 0 !important;
+    padding-bottom: 16px !important;
+  }
+
+}
+
+/* Manual pair's left-picker / preview / right-picker row -- three
+   side-by-side panels, two of them a fixed 230px, leave the middle
+   coverage-map preview too narrow to render its header/legend/ruler
+   without overlapping well before the 640px breakpoint above: with the
+   300px fixed sidebar back (>900px), the preview panel is squeezed to
+   nothing all the way up past 1024px. Stack the row generously wide. */
+@media (max-width: 1150px) {
+  .guide-map-row {
+    flex-direction: column;
+    width: 100%;
+  }
+  .guide-map-row .picker-panel {
+    width: 100%;
+  }
+}

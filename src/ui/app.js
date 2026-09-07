@@ -63,7 +63,7 @@ function renderLanding() {
             <span style="font-size:17px;font-weight:700;letter-spacing:-0.01em;">ErrPresso</span>
           </div>
           <div style="text-align:center;display:flex;flex-direction:column;gap:14px;">
-            <div style="font-size:40px;font-weight:700;letter-spacing:-0.02em;line-height:1.1;">Err2 prime-editing design</div>
+            <div style="font-size:clamp(28px, 8vw, 40px);font-weight:700;letter-spacing:-0.02em;line-height:1.15;">Err2 prime-editing design</div>
             <div style="font-size:15px;color:var(--text-muted);">Paste a sequence. Get pegRNA pairs, ranked by coverage, in your browser.</div>
           </div>
         </div>
@@ -79,9 +79,9 @@ function renderLanding() {
 
           <div id="parse-error"></div>
 
-          <div style="display:flex;gap:10px;">
-            <button class="btn btn-primary" id="design-btn" style="flex:1;">Design pegRNAs ${ICONS.arrowRight}</button>
-            <button class="btn btn-ghost" id="load-example-btn">Load example</button>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="design-btn" style="flex:1 1 200px;">Design pegRNAs ${ICONS.arrowRight}</button>
+            <button class="btn btn-ghost" id="load-example-btn" style="flex:0 0 auto;">Load example</button>
           </div>
         </div>
       </div>

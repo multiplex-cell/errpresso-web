@@ -234,9 +234,9 @@ function renderMain(record, guides, state) {
       <div class="stat-card"><div class="label">Compatible partners</div><div class="stat-value">${compatiblePairs.length.toLocaleString()}</div></div>
     </div>
 
-    <div style="display: flex; align-items: center; justify-content: space-between;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
       <div class="label">Designs</div>
-      <div style="display: flex; align-items: center; gap: 16px;">
+      <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
         ${buildPegrnaLegendHtml()}
         ${downloadCsvButtonHtml("download-csv-btn")}
       </div>

@@ -122,9 +122,9 @@ export function buildCoverageMapHtml({
 
   return `
     <div class="panel" style="padding:16px 22px 12px;">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;margin-bottom:10px;">
         <div class="label">Coverage track</div>
-        <div style="display:flex;align-items:baseline;gap:6px;">
+        <div style="display:flex;align-items:baseline;gap:6px;white-space:nowrap;">
           <span style="font-size:20px;font-weight:700;color:var(--teal);letter-spacing:-0.01em;">${coveragePercent.toFixed(1)}%</span>
           <span style="font-size:11.5px;color:var(--text-faint);">of target</span>
         </div>
@@ -171,7 +171,7 @@ export function buildCoverageMapHtml({
         </div>
       </div>
 
-      <div style="display:flex;align-items:center;gap:20px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-soft);">
+      <div style="display:flex;align-items:center;gap:10px 20px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-soft);">
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:8px;border-radius:3px;background:var(--accent-soft);border:1px solid var(--accent-line);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">nick span</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:8px;border-radius:3px;background:var(--teal);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">overlap / covered</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:5px solid var(--accent);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">nick site</span></div>

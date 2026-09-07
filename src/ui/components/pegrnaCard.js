@@ -32,8 +32,8 @@ export function buildPegrnaCardHtml({ setNumber, headerRight = [], sides, footno
   const sidesHtml = sides
     .map(
       (side, index) => `
-        <div style="display: flex; flex-direction: column; gap: 8px; ${index < sides.length - 1 ? "padding-right: 20px; border-right: 1px solid var(--border-soft);" : ""}">
-          <div style="display: flex; align-items: center; gap: 8px;">
+        <div class="${index < sides.length - 1 ? "pegrna-side-divider" : ""}" style="display: flex; flex-direction: column; gap: 8px; min-width: 0; ${index < sides.length - 1 ? "padding-right: 20px; border-right: 1px solid var(--border-soft);" : ""}">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <span class="label">${side.title}</span>
             ${side.badge ? `<span style="font-size: 10.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 1px 8px;">${side.badge}</span>` : ""}
             <span class="mono" style="font-size: 11px; color: var(--text-faint); margin-left: auto;">${side.lengthNt} nt</span>
@@ -50,7 +50,7 @@ export function buildPegrnaCardHtml({ setNumber, headerRight = [], sides, footno
 
   return `
     <div class="panel" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
-      <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px;">
         <div style="display: flex; align-items: center; gap: 10px;">
           ${
             setNumber !== null && setNumber !== undefined
@@ -59,17 +59,17 @@ export function buildPegrnaCardHtml({ setNumber, headerRight = [], sides, footno
           }
           <span style="font-size: 14px; font-weight: 600;">${setNumber !== null && setNumber !== undefined ? `Set ${setNumber}` : "Design"}</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 18px;">
+        <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
           ${headerRight
             .map(
               (h) =>
-                `<div style="font-size: 12.5px; color: var(--text-muted);">${h.label} <span style="color: ${h.teal ? "var(--teal)" : "var(--text)"}; font-weight: ${h.teal ? "700" : "600"};">${h.value}</span></div>`
+                `<div style="font-size: 12.5px; color: var(--text-muted); white-space: nowrap;">${h.label} <span style="color: ${h.teal ? "var(--teal)" : "var(--text)"}; font-weight: ${h.teal ? "700" : "600"};">${h.value}</span></div>`
             )
             .join("")}
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(${sides.length}, 1fr); gap: 20px;">
+      <div class="pegrna-sides-grid" style="display: grid; grid-template-columns: repeat(${sides.length}, 1fr); gap: 20px;">
         ${sidesHtml}
       </div>
 
@@ -81,11 +81,11 @@ export function buildPegrnaCardHtml({ setNumber, headerRight = [], sides, footno
 /** One shared legend for a list of pegRNA cards -- render it once, not per card. */
 export function buildPegrnaLegendHtml() {
   return `
-    <div style="display: flex; gap: 18px;">
-      <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-faint);"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--text); display: inline-block;"></span>spacer</div>
-      <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-faint);"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--text-faint); display: inline-block;"></span>scaffold</div>
-      <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-faint);"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--teal); display: inline-block;"></span>RTT</div>
-      <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-faint);"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--text); display: inline-block;"></span>PBS</div>
+    <div style="display: flex; gap: 14px 18px; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-faint); white-space: nowrap;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--text); display: inline-block;"></span>spacer</div>
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-faint); white-space: nowrap;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--text-faint); display: inline-block;"></span>scaffold</div>
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-faint); white-space: nowrap;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--teal); display: inline-block;"></span>RTT</div>
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-faint); white-space: nowrap;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--text); display: inline-block;"></span>PBS</div>
     </div>
   `;
 }

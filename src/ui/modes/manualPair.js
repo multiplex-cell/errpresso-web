@@ -126,9 +126,9 @@ function pickerListHtml(sideLabel, sideIcon, guidesList, selectedIndex, side) {
 function renderMain(record, leftGuides, rightGuides, state) {
   const pickersHtml = `
     <div class="label">Guide map</div>
-    <div style="display:flex;gap:20px;align-items:flex-start;">
+    <div class="guide-map-row" style="display:flex;gap:20px;align-items:flex-start;">
       ${pickerListHtml(`Left guides · ${leftGuides.length}`, ICONS.arrowRight, leftGuides, state.leftIndex, "left")}
-      <div class="panel" id="pair-preview" style="flex:1;padding:22px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;min-height:220px;justify-content:center;">
+      <div class="panel" id="pair-preview" style="flex:1;padding:22px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;min-height:220px;justify-content:center;min-width:0;">
         <div style="font-size:12.5px;font-weight:600;color:var(--text-muted);align-self:flex-start;">Pair preview</div>
         <div id="pair-preview-body" style="width:100%;"></div>
       </div>
@@ -224,9 +224,9 @@ function renderMain(record, leftGuides, rightGuides, state) {
         };
 
         return `
-      <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
         <div class="label">Paired pegRNA design</div>
-        <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
           ${buildPegrnaLegendHtml()}
           ${downloadCsvButtonHtml("download-csv-btn")}
         </div>
