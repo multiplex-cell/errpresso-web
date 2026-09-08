@@ -6,8 +6,10 @@
 
 import { makePair } from "../../core/pairs.js";
 import { designPairedPegrnas } from "../../core/pegrnaDesign.js";
+import { intervalsLength } from "../../core/intervals.js";
 import { stepperFieldHtml, attachStepperField, toggleHtml, attachToggle } from "../controls.js";
 import { buildSpacerMapHtml } from "../components/spacerMap.js";
+import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
 import {
   slugify,
@@ -216,7 +218,7 @@ function buildPairCardHtml({ setNumber, pair, design, actions }) {
   });
 }
 
-function buildSavedSetsBlock(record, state) {
+function buildSavedSetsBlock(record, state, exonRange) {
   if (!state.savedSets.length) return { html: "", download: null };
 
   const cardsHtml = state.savedSets
@@ -235,7 +237,33 @@ function buildSavedSetsBlock(record, state) {
     return [pegrnaSideRow(extra, "Left", design.left), pegrnaSideRow(extra, "Right", design.right)];
   });
 
+  // What's actually been picked so far, at a glance -- same coverage
+  // track the algorithmic modes use, just fed from the sets saved here
+  // by hand instead of a ranking pass.
+  const coverageRows = state.savedSets.map(({ pair, design }, i) => ({
+    label: `Set ${i + 1}`,
+    start: pair.leftGuide.nickPosition,
+    end: pair.rightGuide.nickPosition,
+    overlapStart: design.plan.overlapStart,
+    overlapEnd: design.plan.overlapEnd,
+  }));
+  const coveredIntervals = state.savedSets.map(({ pair }) => [pair.leftGuide.nickPosition, pair.rightGuide.nickPosition]);
+  const coveragePercent = record.length > 0 ? (intervalsLength(coveredIntervals) / record.length) * 100.0 : 0.0;
+
+  const coverageMapHtml = buildCoverageMapHtml({
+    sequenceLength: record.length,
+    targetStart: 0,
+    targetEnd: record.length,
+    rows: coverageRows,
+    coveredIntervals,
+    coveragePercent,
+    exonRange,
+  });
+
   const html = `
+    <div class="label">Saved sets coverage</div>
+    ${coverageMapHtml}
+
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
       <div class="label">Saved sets · ${state.savedSets.length}</div>
       <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
@@ -259,7 +287,7 @@ function buildSavedSetsBlock(record, state) {
 }
 
 function renderMain(record, leftGuides, rightGuides, state, exonRange) {
-  const savedBlock = buildSavedSetsBlock(record, state);
+  const savedBlock = buildSavedSetsBlock(record, state, exonRange);
 
   if (state.leftIndex === null || state.rightIndex === null) {
     return {
