@@ -254,6 +254,7 @@ function renderMain(record, pairs, state, exonRange) {
             stats: [
               { label: "Spacer", value: assembled.left.spacerSequence },
               { label: "PBS", value: assembled.left.pbsSequence },
+              { label: "RTT", value: `${assembled.left.rttLength} nt` },
             ],
             spacer: assembled.left.spacerSequence,
             rtt: assembled.left.rttSequence,
@@ -265,6 +266,7 @@ function renderMain(record, pairs, state, exonRange) {
             stats: [
               { label: "Spacer", value: assembled.right.spacerSequence },
               { label: "PBS", value: assembled.right.pbsSequence },
+              { label: "RTT", value: `${assembled.right.rttLength} nt` },
             ],
             spacer: assembled.right.spacerSequence,
             rtt: assembled.right.rttSequence,

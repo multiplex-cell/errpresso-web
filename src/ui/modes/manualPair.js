@@ -192,6 +192,7 @@ function buildPairCardHtml({ setNumber, pair, design, actions }) {
         stats: [
           { label: "PAM", value: design.left.guide.pam },
           { label: "Nick", value: String(design.left.guide.nickPosition) },
+          { label: "RTT", value: `${design.left.rttLength} nt` },
         ],
         spacer: design.left.spacerSequence,
         rtt: design.left.rttSequence,
@@ -203,6 +204,7 @@ function buildPairCardHtml({ setNumber, pair, design, actions }) {
         stats: [
           { label: "PAM", value: design.right.guide.pam },
           { label: "Nick", value: String(design.right.guide.nickPosition) },
+          { label: "RTT", value: `${design.right.rttLength} nt` },
         ],
         spacer: design.right.spacerSequence,
         rtt: design.right.rttSequence,

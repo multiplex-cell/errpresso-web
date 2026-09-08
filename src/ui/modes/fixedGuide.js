@@ -257,6 +257,7 @@ function renderMain(record, guides, leftGuides, rightGuides, state, exonRange) {
             stats: [
               { label: "Spacer", value: d.left.spacerSequence },
               { label: "PBS", value: d.left.pbsSequence },
+              { label: "RTT", value: `${d.left.rttLength} nt` },
             ],
             spacer: d.left.spacerSequence,
             rtt: d.left.rttSequence,
@@ -269,6 +270,7 @@ function renderMain(record, guides, leftGuides, rightGuides, state, exonRange) {
             stats: [
               { label: "Spacer", value: d.right.spacerSequence },
               { label: "PBS", value: d.right.pbsSequence },
+              { label: "RTT", value: `${d.right.rttLength} nt` },
             ],
             spacer: d.right.spacerSequence,
             rtt: d.right.rttSequence,
