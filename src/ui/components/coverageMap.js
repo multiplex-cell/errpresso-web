@@ -18,12 +18,14 @@ function rowNumber(label) {
 
 // Small CSS-triangle nick marker, pointing into the pill from the given
 // edge -- visual shorthand for "this is where the guide actually cuts".
+// Colored by strand the same way the spacer orientation map colors its
+// guide triangles: left/'+' in accent, right/'-' in teal.
 function nickMarker(edge) {
   const common = "position:absolute;top:50%;transform:translateY(-50%);width:0;height:0;";
   if (edge === "left") {
     return `<div style="${common}left:-1px;border-top:3px solid transparent;border-bottom:3px solid transparent;border-left:4px solid var(--accent);"></div>`;
   }
-  return `<div style="${common}right:-1px;border-top:3px solid transparent;border-bottom:3px solid transparent;border-right:4px solid var(--accent);"></div>`;
+  return `<div style="${common}right:-1px;border-top:3px solid transparent;border-bottom:3px solid transparent;border-right:4px solid var(--teal);"></div>`;
 }
 
 // Plain end-cap for a non-nick edge (e.g. where a single guide's RTT
@@ -114,16 +116,13 @@ export function buildCoverageMapHtml({
   };
 
   const gridlinesHtml = ticks
-    .map(
-      (t) =>
-        `<div style="position:absolute;top:0;bottom:0;${t.align === "right" ? "right:0;" : `left:${t.position}%;`}width:1px;background:var(--border-soft);"></div>`
-    )
+    .map((t) => `<div class="spacer-map-gridline" style="${t.align === "right" ? "right:0;" : `left:${t.position}%;`}"></div>`)
     .join("");
 
   return `
-    <div class="panel" style="padding:16px 22px 12px;">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;margin-bottom:10px;">
-        <div class="label">Coverage track</div>
+    <div class="spacer-map">
+      <div class="spacer-map-header" style="margin-bottom:10px;">
+        <div class="spacer-map-label">Coverage track</div>
         <div style="display:flex;align-items:baseline;gap:6px;white-space:nowrap;">
           <span style="font-size:20px;font-weight:700;color:var(--teal);letter-spacing:-0.01em;">${coveragePercent.toFixed(1)}%</span>
           <span style="font-size:11.5px;color:var(--text-faint);">of target</span>
@@ -161,10 +160,7 @@ export function buildCoverageMapHtml({
             <span style="width:${GUTTER - 10}px;flex-shrink:0;"></span>
             <div style="position:relative;flex:1;height:12px;">
               ${ticks
-                .map(
-                  (t) =>
-                    `<span class="mono" style="position:absolute;${tickLabelStyle(t)}font-size:10px;color:var(--text-faint);">${t.label}</span>`
-                )
+                .map((t) => `<span class="spacer-map-tick mono" style="${tickLabelStyle(t)}">${t.label}</span>`)
                 .join("")}
             </div>
           </div>
@@ -174,7 +170,7 @@ export function buildCoverageMapHtml({
       <div style="display:flex;align-items:center;gap:10px 20px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-soft);">
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:8px;border-radius:3px;background:var(--accent-soft);border:1px solid var(--accent-line);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">nick span</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:8px;border-radius:3px;background:var(--teal);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">overlap / covered</span></div>
-        <div style="display:flex;align-items:center;gap:6px;"><span style="width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:5px solid var(--accent);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">nick site</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><span style="width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:5px solid var(--accent);display:inline-block;"></span><span style="width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-right:5px solid var(--teal);display:inline-block;margin-left:-2px;"></span><span style="font-size:12px;color:var(--text-muted);">nick site (+/&minus;)</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:8px;border-radius:3px;background:var(--accent-soft);opacity:0.5;display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">target region</span></div>
       </div>
     </div>

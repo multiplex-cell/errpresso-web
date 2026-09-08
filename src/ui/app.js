@@ -21,9 +21,9 @@ const EXAMPLE_FASTA =
   "TATTCACCATTATAGGTGGGTTTAAATTG\n";
 
 const MODES = [
+  { id: "manual", label: "Manual pair", icon: "manualPair", render: renderManualPairMode },
   { id: "joint", label: "Joint coverage set", icon: "jointCoverage", render: renderJointCoverageMode },
   { id: "fixed", label: "Fixed guide, variable RTT", icon: "fixedGuide", render: renderFixedGuideMode },
-  { id: "manual", label: "Manual pair", icon: "manualPair", render: renderManualPairMode },
   { id: "single", label: "Single pegRNA", icon: "singlePegrna", render: renderSinglePegrnaMode },
 ];
 
