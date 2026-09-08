@@ -5,8 +5,10 @@
 import { parseSequenceText, SequenceParseError } from "../core/sequenceIo.js";
 import { findSpCas9Guides } from "../core/guides.js";
 import { findInwardFacingPairs } from "../core/pairs.js";
+import { filterQualityGuides } from "../core/guideQuality.js";
 import { ICONS, logoMarkSvg } from "./icons.js";
 import { escapeHtml } from "./domUtils.js";
+import { toggleHtml, attachToggle } from "./controls.js";
 import { renderJointCoverageMode } from "./modes/jointCoverage.js";
 import { renderFixedGuideMode } from "./modes/fixedGuide.js";
 import { renderManualPairMode } from "./modes/manualPair.js";
@@ -36,6 +38,7 @@ const appState = {
   inputTab: "paste",
   inputText: "",
   geneState: defaultGeneState(),
+  filterLowQuality: true,
 };
 
 const root = document.getElementById("app");
@@ -225,7 +228,8 @@ function renderWorkspace() {
     return;
   }
 
-  const guides = findSpCas9Guides(record.sequence);
+  const allGuides = findSpCas9Guides(record.sequence);
+  const guides = appState.filterLowQuality ? filterQualityGuides(allGuides) : allGuides;
 
   const showRecordSelector = appState.records.length > 1;
 
@@ -249,6 +253,14 @@ function renderWorkspace() {
       <div class="workspace">
         <div class="sidebar" id="sidebar">
           ${renderModeNav()}
+          <div id="quality-filter-row">
+            ${toggleHtml({
+              id: "filterLowQuality",
+              label: "Filter low-quality spacers",
+              checked: appState.filterLowQuality,
+              info: "Hides guides with a poly-T (TTTT+) run, GC% outside 30–70%, or a 5+ base homopolymer run.",
+            })}
+          </div>
           <div id="mode-sidebar-extra"></div>
         </div>
         <div class="main-content" id="main-content"></div>
@@ -277,10 +289,20 @@ function renderWorkspace() {
     });
   });
 
+  attachToggle(root, "filterLowQuality", (checked) => {
+    appState.filterLowQuality = checked;
+    // The guide pool changed shape -- any picked/saved indices in mode
+    // state could now silently point at a different guide, so reset
+    // per-mode state the same way switching sequences already does.
+    appState.modeState = {};
+    renderWorkspace();
+  });
+
   if (!guides.length) {
     document.getElementById("mode-sidebar-extra").innerHTML = "";
-    document.getElementById("main-content").innerHTML =
-      '<div class="warning-box">No 20-nt guide candidates with an NGG PAM were found in this sequence.</div>';
+    document.getElementById("main-content").innerHTML = allGuides.length
+      ? `<div class="warning-box">All ${allGuides.length} candidate guide${allGuides.length === 1 ? "" : "s"} in this sequence failed the spacer quality filter. Turn off "Filter low-quality spacers" in the sidebar to see them anyway.</div>`
+      : '<div class="warning-box">No 20-nt guide candidates with an NGG PAM were found in this sequence.</div>';
     return;
   }
 

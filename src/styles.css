@@ -176,6 +176,26 @@ button {
   font-size: 13px;
   color: var(--text);
 }
+.info-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  background: var(--border-soft);
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 700;
+  font-style: italic;
+  font-family: Georgia, "Times New Roman", serif;
+  cursor: help;
+  flex-shrink: 0;
+}
+.info-badge:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 .toggle {
   width: 34px;
   height: 19px;
