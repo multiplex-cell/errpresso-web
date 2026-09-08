@@ -598,6 +598,176 @@ details.guide-details .data-table-wrap {
   padding-left: 9px;
 }
 
+/* ---- Spacer orientation map (Manual pair) ---- */
+
+.spacer-map {
+  position: relative;
+  background: oklch(21% 0.025 260);
+  border-radius: 18px;
+  padding: 18px 22px 14px;
+  overflow: hidden;
+  box-shadow:
+    0 8px 24px oklch(0% 0 0 / 0.18),
+    inset 0 0 60px oklch(54% 0.13 260 / 0.08);
+}
+.spacer-map::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    oklch(100% 0 0 / 0.02) 0px,
+    oklch(100% 0 0 / 0.02) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+}
+.spacer-map-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.spacer-map-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: oklch(78% 0.02 260);
+}
+.spacer-map-legend {
+  display: flex;
+  gap: 16px;
+}
+.spacer-map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: oklch(72% 0.03 260);
+}
+.spacer-map-legend-item svg {
+  color: oklch(70% 0.13 260);
+}
+.spacer-map-legend-item.minus svg {
+  color: oklch(70% 0.11 190);
+}
+
+.spacer-map-track {
+  position: relative;
+  height: 110px;
+  margin-top: 16px;
+}
+.spacer-map-gridlines {
+  position: absolute;
+  inset: 0;
+}
+.spacer-map-gridline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: oklch(100% 0 0 / 0.06);
+}
+.spacer-map-baseline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: oklch(100% 0 0 / 0.16);
+}
+.spacer-map-connector {
+  position: absolute;
+  top: calc(50% - 1px);
+  height: 2px;
+  background: oklch(85% 0.14 95);
+  box-shadow: 0 0 8px oklch(85% 0.14 95 / 0.7);
+  border-radius: 999px;
+}
+.spacer-map-connector.invalid {
+  background: var(--danger);
+  box-shadow: 0 0 8px oklch(55% 0.16 25 / 0.6);
+}
+
+.spacer-map-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+}
+.spacer-map-row.plus {
+  top: 50%;
+}
+.spacer-map-row.minus {
+  top: 50%;
+}
+
+.spacer-tri-hit {
+  position: absolute;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: oklch(60% 0.1 260);
+}
+.spacer-tri-hit.plus {
+  transform: translateY(-100%);
+  padding-bottom: 4px;
+}
+.spacer-tri-hit.minus {
+  color: oklch(58% 0.09 190);
+  padding-top: 4px;
+}
+.spacer-tri-hit.plus::after,
+.spacer-tri-hit.minus::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 1px;
+  background: currentColor;
+  opacity: 0.5;
+}
+.spacer-tri-hit.plus::after {
+  bottom: 0;
+  height: 10px;
+}
+.spacer-tri-hit.minus::after {
+  top: 0;
+  height: 10px;
+}
+.spacer-tri-hit:hover {
+  color: oklch(85% 0.14 260);
+  filter: drop-shadow(0 0 6px oklch(70% 0.16 260 / 0.7));
+}
+.spacer-tri-hit.minus:hover {
+  color: oklch(82% 0.12 190);
+  filter: drop-shadow(0 0 6px oklch(68% 0.13 190 / 0.7));
+}
+.spacer-tri-hit.selected {
+  color: oklch(88% 0.16 95);
+  filter: drop-shadow(0 0 8px oklch(85% 0.16 95 / 0.85));
+  z-index: 2;
+}
+
+.spacer-map-ruler {
+  position: relative;
+  height: 14px;
+  margin-top: 6px;
+}
+.spacer-map-tick {
+  position: absolute;
+  font-size: 10.5px;
+  color: oklch(60% 0.02 260);
+}
+
 /* ---- Gene symbol autocomplete ---- */
 
 .gene-suggest-panel {

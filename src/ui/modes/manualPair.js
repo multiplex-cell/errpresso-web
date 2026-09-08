@@ -1,12 +1,11 @@
-// Manual pair mode -- pick one '+' guide and one '-' guide from two
-// independent lists to build a pair by hand, with a live preview map.
+// Manual pair mode -- pick one '+' guide and one '-' guide from a
+// spatial orientation map to build a pair by hand.
 
 import { makePair } from "../../core/pairs.js";
 import { designPairedPegrnas } from "../../core/pegrnaDesign.js";
 import { stepperFieldHtml, attachStepperField, toggleHtml, attachToggle } from "../controls.js";
-import { buildCoverageMapHtml } from "../components/coverageMap.js";
+import { buildSpacerMapHtml } from "../components/spacerMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
-import { ICONS } from "../icons.js";
 import {
   slugify,
   pegrnaSideRow,
@@ -38,7 +37,7 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
       ${stepperFieldHtml({ id: "overlapLength", label: "RTT overlap length", value: state.overlapLength })}
       ${toggleHtml({ id: "centerOverlap", label: "Center overlap", checked: state.centerOverlap })}
     </div>
-    <div class="caption">Pick one guide on the left and one on the right to form a pair. Click a picked row again to clear it.</div>
+    <div class="caption">Click a triangle above the line ('+' strand) and one below ('-' strand) to form a pair. Click a picked triangle again to clear it.</div>
   `;
 
   attachStepperField(sidebarExtra, "pbs", { min: 1, max: 30 }, (v) => {
@@ -105,46 +104,26 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
   recompute();
 }
 
-function pickerListHtml(sideLabel, sideIcon, guidesList, selectedIndex, side) {
-  return `
-    <div class="picker-panel">
-      <div class="picker-header">${side === "left" ? sideIcon : ""}${sideLabel}${side === "right" ? sideIcon : ""}</div>
-      <div class="picker-list">
-        ${guidesList
-          .map(
-            (g, i) => `
-          <div class="picker-row ${i === selectedIndex ? "selected" : ""}" data-picker-row data-side="${side}" data-index="${i}">
-            <span class="mono">${g.nickPosition}</span>
-          </div>`
-          )
-          .join("")}
-      </div>
-    </div>
-  `;
-}
-
 function renderMain(record, leftGuides, rightGuides, state) {
-  const pickersHtml = `
+  const mapHtml = buildSpacerMapHtml({
+    sequenceLength: record.length,
+    leftGuides,
+    rightGuides,
+    selectedLeftIndex: state.leftIndex,
+    selectedRightIndex: state.rightIndex,
+  });
+
+  const mapBlock = `
     <div class="label">Guide map</div>
-    <div class="guide-map-row" style="display:flex;gap:20px;align-items:flex-start;">
-      ${pickerListHtml(`Left guides · ${leftGuides.length}`, ICONS.arrowRight, leftGuides, state.leftIndex, "left")}
-      <div class="panel" id="pair-preview" style="flex:1;padding:22px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;min-height:220px;justify-content:center;min-width:0;">
-        <div style="font-size:12.5px;font-weight:600;color:var(--text-muted);align-self:flex-start;">Pair preview</div>
-        <div id="pair-preview-body" style="width:100%;"></div>
-      </div>
-      ${pickerListHtml(`Right guides · ${rightGuides.length}`, ICONS.arrowLeft, rightGuides, state.rightIndex, "right")}
-    </div>
+    ${mapHtml}
     <button class="btn btn-ghost btn-sm" id="clear-pick-btn" style="width:fit-content;">Clear left / right pick</button>
   `;
 
-  const fillPreview = (html) =>
-    pickersHtml.replace(
-      '<div id="pair-preview-body" style="width:100%;"></div>',
-      `<div id="pair-preview-body" style="width:100%;">${html}</div>`
-    );
-
   if (state.leftIndex === null || state.rightIndex === null) {
-    return { html: fillPreview('<div class="caption" style="text-align:center;">Pick one guide on the left and one on the right.</div>'), download: null };
+    return {
+      html: `${mapBlock}<div class="caption">Pick one triangle above the line and one below to form a pair.</div>`,
+      download: null,
+    };
   }
 
   const left = leftGuides[state.leftIndex];
@@ -152,10 +131,7 @@ function renderMain(record, leftGuides, rightGuides, state) {
 
   if (left.nickPosition >= right.nickPosition) {
     return {
-      html: `
-      ${fillPreview('<div class="caption" style="text-align:center;color:var(--danger);">Not an inward-facing pair.</div>')}
-      <div class="warning-box">The picked '+' guide isn't to the left of the picked '-' guide, so they can't form an inward-facing pair.</div>
-    `,
+      html: `${mapBlock}<div class="warning-box">The picked '+' guide isn't to the left of the picked '-' guide, so they can't form an inward-facing pair.</div>`,
       download: null,
     };
   }
@@ -193,85 +169,60 @@ function renderMain(record, leftGuides, rightGuides, state) {
     error = e;
   }
 
-  const previewHtml = design
-    ? buildCoverageMapHtml({
-        sequenceLength: record.length,
-        targetStart: 0,
-        targetEnd: record.length,
-        rows: [
-          {
-            label: "1",
-            start: pair.betweenNicksStart,
-            end: pair.betweenNicksEnd,
-            overlapStart: design.plan.overlapStart,
-            overlapEnd: design.plan.overlapEnd,
-          },
-        ],
-        coveredIntervals: [[pair.betweenNicksStart, pair.betweenNicksEnd]],
-        coveragePercent: record.length > 0 ? (nickDistance / record.length) * 100.0 : 0.0,
-      })
-    : `<div class="warning-box">${error.message}</div>`;
+  if (!design) {
+    return { html: `${mapBlock}${overlapStartField}<div class="warning-box">${error.message}</div>`, download: null };
+  }
 
-  let download = null;
+  const extra = { overlap_length_nt: design.plan.overlapLength };
+  const download = {
+    filename: `errpresso_manual-pair_${slugify(record.recordId)}.csv`,
+    rows: [pegrnaSideRow(extra, "Left", design.left), pegrnaSideRow(extra, "Right", design.right)],
+    columns: CSV_COLUMNS,
+  };
 
-  const resultHtml = design
-    ? (() => {
-        const extra = { overlap_length_nt: design.plan.overlapLength };
-        download = {
-          filename: `errpresso_manual-pair_${slugify(record.recordId)}.csv`,
-          rows: [pegrnaSideRow(extra, "Left", design.left), pegrnaSideRow(extra, "Right", design.right)],
-          columns: CSV_COLUMNS,
-        };
-
-        return `
-      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-        <div class="label">Paired pegRNA design</div>
-        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-          ${buildPegrnaLegendHtml()}
-          ${downloadCsvButtonHtml("download-csv-btn")}
-        </div>
+  const resultHtml = `
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+      <div class="label">Paired pegRNA design</div>
+      <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+        ${buildPegrnaLegendHtml()}
+        ${downloadCsvButtonHtml("download-csv-btn")}
       </div>
-      ${design.plan.overlapLength === nickDistance ? '<div class="warning-box">The overlap covers the entire interval between the nick sites.</div>' : ""}
-      ${Math.max(design.left.rttLength, design.right.rttLength) > 80 ? '<div class="warning-box">At least one RTT is longer than 80 nt. Long RTT designs may require additional experimental validation.</div>' : ""}
-      ${buildPegrnaCardHtml({
-        setNumber: null,
-        headerRight: [{ label: "Overlap", value: `${design.plan.overlapLength} nt` }],
-        sides: [
-          {
-            title: "Left pegRNA",
-            stats: [
-              { label: "PAM", value: design.left.guide.pam },
-              { label: "Nick", value: String(design.left.guide.nickPosition) },
-            ],
-            spacer: design.left.spacerSequence,
-            rtt: design.left.rttSequence,
-            pbs: design.left.pbsSequence,
-            lengthNt: design.left.fullLength,
-          },
-          {
-            title: "Right pegRNA",
-            stats: [
-              { label: "PAM", value: design.right.guide.pam },
-              { label: "Nick", value: String(design.right.guide.nickPosition) },
-            ],
-            spacer: design.right.spacerSequence,
-            rtt: design.right.rttSequence,
-            pbs: design.right.pbsSequence,
-            lengthNt: design.right.fullLength,
-          },
-        ],
-        footnote: `Nick interval ${pair.leftGuide.nickPosition}–${pair.rightGuide.nickPosition} · overlap ${design.plan.overlapStart}–${design.plan.overlapEnd}`,
-      })}
-    `;
-      })()
-    : "";
+    </div>
+    ${design.plan.overlapLength === nickDistance ? '<div class="warning-box">The overlap covers the entire interval between the nick sites.</div>' : ""}
+    ${Math.max(design.left.rttLength, design.right.rttLength) > 80 ? '<div class="warning-box">At least one RTT is longer than 80 nt. Long RTT designs may require additional experimental validation.</div>' : ""}
+    ${buildPegrnaCardHtml({
+      setNumber: null,
+      headerRight: [{ label: "Overlap", value: `${design.plan.overlapLength} nt` }],
+      sides: [
+        {
+          title: "Left pegRNA",
+          stats: [
+            { label: "PAM", value: design.left.guide.pam },
+            { label: "Nick", value: String(design.left.guide.nickPosition) },
+          ],
+          spacer: design.left.spacerSequence,
+          rtt: design.left.rttSequence,
+          pbs: design.left.pbsSequence,
+          lengthNt: design.left.fullLength,
+        },
+        {
+          title: "Right pegRNA",
+          stats: [
+            { label: "PAM", value: design.right.guide.pam },
+            { label: "Nick", value: String(design.right.guide.nickPosition) },
+          ],
+          spacer: design.right.spacerSequence,
+          rtt: design.right.rttSequence,
+          pbs: design.right.pbsSequence,
+          lengthNt: design.right.fullLength,
+        },
+      ],
+      footnote: `Nick interval ${pair.leftGuide.nickPosition}–${pair.rightGuide.nickPosition} · overlap ${design.plan.overlapStart}–${design.plan.overlapEnd}`,
+    })}
+  `;
 
   return {
-    html: `
-    ${fillPreview(previewHtml)}
-    ${overlapStartField}
-    ${resultHtml}
-  `,
+    html: `${mapBlock}${overlapStartField}${resultHtml}`,
     download,
   };
 }
