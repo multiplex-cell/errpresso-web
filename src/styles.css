@@ -602,29 +602,13 @@ details.guide-details .data-table-wrap {
 
 .spacer-map {
   position: relative;
-  background: oklch(21% 0.025 260);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
   border-radius: 18px;
   padding: 18px 22px 14px;
-  overflow: hidden;
-  box-shadow:
-    0 8px 24px oklch(0% 0 0 / 0.18),
-    inset 0 0 60px oklch(54% 0.13 260 / 0.08);
-}
-.spacer-map::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    oklch(100% 0 0 / 0.02) 0px,
-    oklch(100% 0 0 / 0.02) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  pointer-events: none;
+  box-shadow: 0 4px 16px oklch(0% 0 0 / 0.06), 0 1px 2px oklch(0% 0 0 / 0.04);
 }
 .spacer-map-header {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -636,7 +620,7 @@ details.guide-details .data-table-wrap {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: oklch(78% 0.02 260);
+  color: var(--text-faint);
 }
 .spacer-map-legend {
   display: flex;
@@ -647,13 +631,13 @@ details.guide-details .data-table-wrap {
   align-items: center;
   gap: 6px;
   font-size: 11.5px;
-  color: oklch(72% 0.03 260);
+  color: var(--text-muted);
 }
 .spacer-map-legend-item svg {
-  color: oklch(70% 0.13 260);
+  color: var(--accent);
 }
 .spacer-map-legend-item.minus svg {
-  color: oklch(70% 0.11 190);
+  color: var(--teal);
 }
 
 .spacer-map-track {
@@ -670,7 +654,7 @@ details.guide-details .data-table-wrap {
   top: 0;
   bottom: 0;
   width: 1px;
-  background: oklch(100% 0 0 / 0.06);
+  background: var(--border-soft);
 }
 .spacer-map-baseline {
   position: absolute;
@@ -678,19 +662,17 @@ details.guide-details .data-table-wrap {
   right: 0;
   top: 50%;
   height: 1px;
-  background: oklch(100% 0 0 / 0.16);
+  background: var(--border);
 }
 .spacer-map-connector {
   position: absolute;
   top: calc(50% - 1px);
   height: 2px;
-  background: oklch(85% 0.14 95);
-  box-shadow: 0 0 8px oklch(85% 0.14 95 / 0.7);
+  background: var(--accent);
   border-radius: 999px;
 }
 .spacer-map-connector.invalid {
   background: var(--danger);
-  box-shadow: 0 0 8px oklch(55% 0.16 25 / 0.6);
 }
 
 .spacer-map-row {
@@ -716,14 +698,14 @@ details.guide-details .data-table-wrap {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: oklch(60% 0.1 260);
+  color: var(--accent-line);
 }
 .spacer-tri-hit.plus {
   transform: translateY(-100%);
   padding-bottom: 4px;
 }
 .spacer-tri-hit.minus {
-  color: oklch(58% 0.09 190);
+  color: var(--teal-line);
   padding-top: 4px;
 }
 .spacer-tri-hit.plus::after,
@@ -733,7 +715,7 @@ details.guide-details .data-table-wrap {
   left: 50%;
   width: 1px;
   background: currentColor;
-  opacity: 0.5;
+  opacity: 0.6;
 }
 .spacer-tri-hit.plus::after {
   bottom: 0;
@@ -744,17 +726,20 @@ details.guide-details .data-table-wrap {
   height: 10px;
 }
 .spacer-tri-hit:hover {
-  color: oklch(85% 0.14 260);
-  filter: drop-shadow(0 0 6px oklch(70% 0.16 260 / 0.7));
+  color: var(--accent);
 }
 .spacer-tri-hit.minus:hover {
-  color: oklch(82% 0.12 190);
-  filter: drop-shadow(0 0 6px oklch(68% 0.13 190 / 0.7));
+  color: var(--teal);
 }
 .spacer-tri-hit.selected {
-  color: oklch(88% 0.16 95);
-  filter: drop-shadow(0 0 8px oklch(85% 0.16 95 / 0.85));
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
   z-index: 2;
+}
+.spacer-tri-hit.minus.selected {
+  color: var(--teal);
+  background: var(--teal-soft);
 }
 
 .spacer-map-ruler {
@@ -765,7 +750,7 @@ details.guide-details .data-table-wrap {
 .spacer-map-tick {
   position: absolute;
   font-size: 10.5px;
-  color: oklch(60% 0.02 260);
+  color: var(--text-faint);
 }
 
 /* ---- Gene symbol autocomplete ---- */
