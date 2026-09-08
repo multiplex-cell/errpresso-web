@@ -45,7 +45,7 @@ export function attachStepperField(container, id, { min, max, step = 1 }, onChan
 
 export function toggleHtml({ id, label, checked, help, info }) {
   const labelHtml = info
-    ? `<span style="display:inline-flex;align-items:center;gap:6px;">${label}<span class="info-badge" title="${info}">i</span></span>`
+    ? `<span style="display:inline-flex;align-items:center;gap:6px;">${label}<span class="info-badge" tabindex="0" data-tooltip="${info}">i</span></span>`
     : label;
   return `
     <label class="toggle-row" data-toggle-row="${id}">

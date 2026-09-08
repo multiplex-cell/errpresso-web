@@ -166,6 +166,7 @@ button {
 /* ---- Toggle switch ---- */
 
 .toggle-row {
+  position: relative; /* anchors the info-badge tooltip below, at the row's full width */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -192,9 +193,45 @@ button {
   cursor: help;
   flex-shrink: 0;
 }
-.info-badge:hover {
+.info-badge:hover,
+.info-badge:focus-visible {
   background: var(--accent-soft);
   color: var(--accent);
+  outline: none;
+}
+/* Custom tooltip instead of the native title attribute -- shows
+   instantly and reliably on hover/focus, unlike the browser's own
+   (slow, easy to miss, inconsistent across browsers). Positioned
+   relative to the whole .toggle-row, not the tiny badge itself, so it
+   spans the sidebar's width instead of overflowing past its edge. */
+.info-badge::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  background: var(--text);
+  color: var(--surface);
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  font-style: normal;
+  line-height: 1.4;
+  padding: 8px 10px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px oklch(0% 0 0 / 0.15);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 20;
+}
+.info-badge:hover::after,
+.info-badge:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 .toggle {
   width: 34px;
