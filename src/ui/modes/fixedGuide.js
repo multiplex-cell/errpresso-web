@@ -1,13 +1,14 @@
-// Fixed guide, variable RTT mode -- one fixed guide, opposite-strand
-// partners found over increasing distances, spread across the range.
+// Fixed guide, variable RTT mode -- click one guide on the spacer map
+// to fix it, and opposite-strand partners are found automatically over
+// increasing distances, spread across the range.
 
 import { findPairsForFixedGuide, selectSpanningPairs } from "../../core/fixedAnchor.js";
 import { designPairedPegrnas } from "../../core/pegrnaDesign.js";
 import { SequenceParseError } from "../../core/sequenceIo.js";
 import { stepperFieldHtml, attachStepperField, singleSliderHtml, attachSingleSlider } from "../controls.js";
+import { buildSpacerMapHtml } from "../components/spacerMap.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
-import { escapeHtml } from "../domUtils.js";
 import {
   slugify,
   pegrnaSideRow,
@@ -25,44 +26,43 @@ const CSV_COLUMNS = [
 ];
 
 function defaults() {
-  return { fixedGuideIndex: 0, pairCount: 5, overlapLength: 30, pbs: 13 };
-}
-
-function guideLabel(guide) {
-  const arrow = guide.strand === "+" ? "→" : "←";
-  return `${arrow} ${guide.spacer} | strand ${guide.strand} | nick ${guide.nickPosition}`;
+  return { fixedSide: null, fixedIndex: null, pairCount: 5, overlapLength: 30, pbs: 13 };
 }
 
 export function renderFixedGuideMode({ record, guides, state, sidebarExtra, mainContent }) {
   Object.assign(state, { ...defaults(), ...state });
-  state.fixedGuideIndex = Math.min(state.fixedGuideIndex, guides.length - 1);
 
-  sidebarExtra.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <div class="label">Fixed guide</div>
-      <select class="field" id="fixed-guide-select" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:12.5px;">
-        ${guides
-          .map((g, i) => `<option value="${i}" ${i === state.fixedGuideIndex ? "selected" : ""}>${escapeHtml(guideLabel(g))}</option>`)
-          .join("")}
-      </select>
-    </div>
+  const leftGuides = guides.filter((g) => g.strand === "+").sort((a, b) => a.nickPosition - b.nickPosition);
+  const rightGuides = guides.filter((g) => g.strand === "-").sort((a, b) => b.nickPosition - a.nickPosition);
 
-    <div style="display:flex;flex-direction:column;gap:14px;" id="partner-search-controls"></div>
-  `;
+  // Clamp in case the record changed underneath a stale pick.
+  const pickedGuides = state.fixedSide === "left" ? leftGuides : rightGuides;
+  if (state.fixedSide !== null && (state.fixedIndex === null || state.fixedIndex >= pickedGuides.length)) {
+    state.fixedSide = null;
+    state.fixedIndex = null;
+  }
 
-  sidebarExtra.querySelector("#fixed-guide-select").addEventListener("change", (e) => {
-    state.fixedGuideIndex = Number(e.target.value);
-    renderPartnerControls();
-    recompute();
-  });
+  sidebarExtra.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px;" id="partner-search-controls"></div>`;
+
+  function fixedGuide() {
+    if (state.fixedSide === null) return null;
+    return (state.fixedSide === "left" ? leftGuides : rightGuides)[state.fixedIndex];
+  }
 
   function renderPartnerControls() {
-    const fixedGuide = guides[state.fixedGuideIndex];
-    const compatiblePairs = findPairsForFixedGuide(guides, fixedGuide);
     const controls = sidebarExtra.querySelector("#partner-search-controls");
+    const guide = fixedGuide();
+
+    if (!guide) {
+      controls.innerHTML = `<div class="caption">Click a triangle above the line ('+' strand) or below ('-' strand) to choose the fixed guide.</div>`;
+      return;
+    }
+
+    const compatiblePairs = findPairsForFixedGuide(guides, guide);
+    const readout = `<div class="label">Fixed guide</div><div class="caption mono" style="font-size:11.5px;">${guide.strand} · nick ${guide.nickPosition} · ${guide.spacer}</div>`;
 
     if (!compatiblePairs.length) {
-      controls.innerHTML = "";
+      controls.innerHTML = `${readout}<div class="caption">No inward-facing opposite-strand partner was found for this guide.</div>`;
       return;
     }
 
@@ -71,6 +71,7 @@ export function renderFixedGuideMode({ record, guides, state, sidebarExtra, main
     state.overlapLength = Math.min(state.overlapLength, maxDistance);
 
     controls.innerHTML = `
+      ${readout}
       <div class="label">Partner search</div>
       ${singleSliderHtml({
         id: "pairCount",
@@ -100,26 +101,77 @@ export function renderFixedGuideMode({ record, guides, state, sidebarExtra, main
   renderPartnerControls();
 
   function recompute() {
-    const { html, download } = renderMain(record, guides, state);
+    const { html, download } = renderMain(record, guides, leftGuides, rightGuides, state);
     mainContent.innerHTML = html;
     wireDownloadButton(mainContent, download);
+    attachListeners();
+  }
+
+  function attachListeners() {
+    mainContent.querySelectorAll("[data-picker-row]").forEach((row) => {
+      row.addEventListener("click", () => {
+        const side = row.dataset.side;
+        const index = Number(row.dataset.index);
+        const isSame = state.fixedSide === side && state.fixedIndex === index;
+        state.fixedSide = isSame ? null : side;
+        state.fixedIndex = isSame ? null : index;
+        renderPartnerControls();
+        recompute();
+      });
+    });
+
+    const clearBtn = mainContent.querySelector("#clear-pick-btn");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        state.fixedSide = null;
+        state.fixedIndex = null;
+        renderPartnerControls();
+        recompute();
+      });
+    }
   }
 
   recompute();
 }
 
-function renderMain(record, guides, state) {
-  const fixedGuide = guides[state.fixedGuideIndex];
+function buildMapBlock(record, leftGuides, rightGuides, state) {
+  const mapHtml = buildSpacerMapHtml({
+    sequenceLength: record.length,
+    leftGuides,
+    rightGuides,
+    selectedLeftIndex: state.fixedSide === "left" ? state.fixedIndex : null,
+    selectedRightIndex: state.fixedSide === "right" ? state.fixedIndex : null,
+    overlapRange: null,
+  });
+
+  return `
+    <div class="label">Guide map</div>
+    ${mapHtml}
+    <button class="btn btn-ghost btn-sm" id="clear-pick-btn" style="width:fit-content;">Clear fixed guide</button>
+  `;
+}
+
+function renderMain(record, guides, leftGuides, rightGuides, state) {
+  const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state);
+
+  if (state.fixedSide === null) {
+    return {
+      html: `${mapBlock}<div class="caption">Click a triangle above the line ('+' strand) or below ('-' strand) to choose the fixed guide -- compatible partners fill in automatically.</div>`,
+      download: null,
+    };
+  }
+
+  const fixedGuide = (state.fixedSide === "left" ? leftGuides : rightGuides)[state.fixedIndex];
   const compatiblePairs = findPairsForFixedGuide(guides, fixedGuide);
 
   if (!compatiblePairs.length) {
-    return { html: `<div class="warning-box">No inward-facing opposite-strand partner was found.</div>`, download: null };
+    return { html: `${mapBlock}<div class="warning-box">No inward-facing opposite-strand partner was found for this guide.</div>`, download: null };
   }
 
   const overlapCompatible = compatiblePairs.filter((p) => p.nickDistance >= state.overlapLength);
 
   if (!overlapCompatible.length) {
-    return { html: `<div class="warning-box">No partner pair is long enough for this overlap.</div>`, download: null };
+    return { html: `${mapBlock}<div class="warning-box">No partner pair is long enough for this overlap.</div>`, download: null };
   }
 
   const selectedPairs = selectSpanningPairs(overlapCompatible, state.pairCount);
@@ -136,7 +188,7 @@ function renderMain(record, guides, state) {
   }
 
   if (!designs.length) {
-    return { html: `<div class="warning-box">No selected pair supports the requested PBS and overlap.</div>`, download: null };
+    return { html: `${mapBlock}<div class="warning-box">No selected pair supports the requested PBS and overlap.</div>`, download: null };
   }
 
   const rows = designs.map((d, i) => ({
@@ -160,7 +212,7 @@ function renderMain(record, guides, state) {
     ).total;
   const coveragePercent = record.length > 0 ? (mergedLength / record.length) * 100.0 : 0.0;
 
-  const mapHtml = buildCoverageMapHtml({
+  const coverageMapHtml = buildCoverageMapHtml({
     sequenceLength: record.length,
     targetStart: 0,
     targetEnd: record.length,
@@ -226,8 +278,10 @@ function renderMain(record, guides, state) {
   };
 
   const html = `
+    ${mapBlock}
+
     <div class="label">Variable-reach map</div>
-    ${mapHtml}
+    ${coverageMapHtml}
     <div class="stat-grid">
       <div class="stat-card"><div class="label">Partner pairs shown</div><div class="stat-value">${designs.length}</div></div>
       <div class="stat-card"><div class="label">Sequence covered</div><div class="stat-value teal">${coveragePercent.toFixed(1)}%</div></div>

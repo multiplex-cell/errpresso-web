@@ -1,20 +1,12 @@
-// Single pegRNA mode -- greedily selects standalone (non-paired) guides
-// that jointly maximize target coverage under RTT-size constraints.
+// Single pegRNA mode -- pick one guide (either strand) from the same
+// spatial orientation map Manual pair uses, then save it as a set and
+// keep picking. Saved sets accumulate below, each frozen at save time
+// so later changes to PBS/RTT length don't retroactively change a set
+// you already saved.
 
-import { rankSingleGuidesWithRttConstraints, designSinglePegrna } from "../../core/singlePegrna.js";
-import { selectSynergisticSingleDesigns } from "../../core/singleSynergy.js";
-import { SequenceParseError } from "../../core/sequenceIo.js";
-import {
-  stepperFieldHtml,
-  attachStepperField,
-  toggleHtml,
-  attachToggle,
-  singleSliderHtml,
-  attachSingleSlider,
-  dualSliderHtml,
-  attachDualSlider,
-} from "../controls.js";
-import { buildCoverageMapHtml } from "../components/coverageMap.js";
+import { designSinglePegrna } from "../../core/singlePegrna.js";
+import { stepperFieldHtml, attachStepperField } from "../controls.js";
+import { buildSpacerMapHtml } from "../components/spacerMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
 import {
   slugify,
@@ -24,22 +16,15 @@ import {
   wireDownloadButton,
 } from "../csvExport.js";
 
-const CSV_COLUMNS = [
-  { key: "set", label: "set" },
-  ...PEGRNA_BASE_COLUMNS,
-  { key: "new_bases", label: "new_bases" },
-  { key: "cumulative_coverage_percent", label: "cumulative_coverage_percent" },
-];
+const CSV_COLUMNS = [{ key: "set", label: "set" }, ...PEGRNA_BASE_COLUMNS];
 
 function defaults(record) {
   return {
-    targetStart: 0,
-    targetEnd: record.length,
-    preferredRtt: Math.min(50, record.length || 1),
-    wiggle: Math.min(20, record.length || 1),
     pbs: 13,
-    maxDesigns: 5,
-    forceMax: false,
+    rttLength: Math.min(50, Math.max(record.length, 1)),
+    selectedSide: null, // "left" ('+') | "right" ('-') | null
+    selectedIndex: null,
+    savedSets: [], // frozen pegRNA designs, in save order
   };
 }
 
@@ -48,232 +33,207 @@ export function renderSinglePegrnaMode({ record, guides, state, sidebarExtra, ma
 
   sidebarExtra.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:10px;">
-      <div class="label">Target region</div>
-      ${dualSliderHtml({
-        id: "target",
-        min: 0,
-        max: record.length,
-        valueStart: state.targetStart,
-        valueEnd: state.targetEnd,
-      })}
+      <div class="label">Design parameters</div>
+      ${stepperFieldHtml({ id: "pbs", label: "PBS length", value: state.pbs })}
+      ${stepperFieldHtml({ id: "rttLength", label: "RTT length", value: state.rttLength })}
     </div>
-
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <div class="label">Design constraints</div>
-      <div class="constraints-grid">
-        ${stepperFieldHtml({ id: "preferredRtt", label: "Preferred RTT", value: state.preferredRtt })}
-        ${stepperFieldHtml({ id: "wiggle", label: "Wiggle (± nt)", value: state.wiggle })}
-      </div>
-      ${stepperFieldHtml({ id: "pbs", label: "PBS", value: state.pbs })}
-    </div>
-
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      ${singleSliderHtml({
-        id: "maxDesigns",
-        label: "Maximum guides",
-        value: state.maxDesigns,
-        min: 1,
-        max: 20,
-      })}
-    </div>
-
-    <div style="display:flex;flex-direction:column;gap:14px;">
-      ${toggleHtml({
-        id: "forceMax",
-        label: "Always fill to the maximum guide count",
-        checked: state.forceMax,
-        help: "Adds backup guides once coverage stops improving.",
-      })}
-    </div>
+    <div class="caption">Click a triangle to pick a guide, then save it as a set and pick the next one.</div>
   `;
 
-  attachDualSlider(sidebarExtra, "target", (start, end) => {
-    state.targetStart = start;
-    state.targetEnd = end;
-    recompute();
-  });
-  attachStepperField(sidebarExtra, "preferredRtt", { min: 1, max: Math.max(record.length, 1) }, (v) => {
-    state.preferredRtt = v;
-    recompute();
-  });
-  attachStepperField(sidebarExtra, "wiggle", { min: 0, max: Math.max(record.length, 1) }, (v) => {
-    state.wiggle = v;
-    recompute();
-  });
   attachStepperField(sidebarExtra, "pbs", { min: 1, max: 30 }, (v) => {
     state.pbs = v;
     recompute();
   });
-  attachSingleSlider(sidebarExtra, "maxDesigns", (v) => {
-    state.maxDesigns = v;
-    recompute();
-  });
-  attachToggle(sidebarExtra, "forceMax", (v) => {
-    state.forceMax = v;
+  attachStepperField(sidebarExtra, "rttLength", { min: 1, max: Math.max(record.length, 1) }, (v) => {
+    state.rttLength = v;
     recompute();
   });
 
+  const leftGuides = guides.filter((g) => g.strand === "+").sort((a, b) => a.nickPosition - b.nickPosition);
+  const rightGuides = guides.filter((g) => g.strand === "-").sort((a, b) => b.nickPosition - a.nickPosition);
+
   function recompute() {
-    const { html, download } = renderMain(record, guides, state);
+    const { html, download } = renderMain(record, leftGuides, rightGuides, state);
     mainContent.innerHTML = html;
     wireDownloadButton(mainContent, download);
+    attachListeners();
+  }
+
+  function attachListeners() {
+    mainContent.querySelectorAll("[data-picker-row]").forEach((row) => {
+      row.addEventListener("click", () => {
+        const side = row.dataset.side;
+        const index = Number(row.dataset.index);
+        const isSame = state.selectedSide === side && state.selectedIndex === index;
+        state.selectedSide = isSame ? null : side;
+        state.selectedIndex = isSame ? null : index;
+        recompute();
+      });
+    });
+
+    const clearBtn = mainContent.querySelector("#clear-pick-btn");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        state.selectedSide = null;
+        state.selectedIndex = null;
+        recompute();
+      });
+    }
+
+    const saveBtn = mainContent.querySelector("#save-set-btn");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", () => {
+        const { design } = resolveCurrentDesign(record, leftGuides, rightGuides, state);
+        if (!design) return;
+        state.savedSets.push(design);
+        state.selectedSide = null;
+        state.selectedIndex = null;
+        recompute();
+      });
+    }
+
+    mainContent.querySelectorAll("[data-remove-set-index]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.savedSets.splice(Number(btn.dataset.removeSetIndex), 1);
+        recompute();
+      });
+    });
   }
 
   recompute();
 }
 
-function renderMain(record, guides, state) {
-  if (state.targetEnd <= state.targetStart) {
-    return { html: `<div class="label">Joint coverage map</div><div class="warning-box">The target interval must contain at least one base.</div>`, download: null };
+/** Resolve the design for whatever guide is currently picked, exactly
+ * the same computation renderMain uses for display -- shared so "Save
+ * as set" saves precisely what's on screen. */
+function resolveCurrentDesign(record, leftGuides, rightGuides, state) {
+  if (state.selectedSide === null) return { design: null, error: null };
+
+  const guide = (state.selectedSide === "left" ? leftGuides : rightGuides)[state.selectedIndex];
+
+  try {
+    const design = designSinglePegrna(record.sequence, guide, state.rttLength, state.pbs);
+    return { design, error: null };
+  } catch (e) {
+    return { design: null, error: e };
   }
+}
 
-  const minimumRttLength = Math.max(1, state.preferredRtt - state.wiggle);
-  const maximumRttLength = state.preferredRtt + state.wiggle;
-
-  const feasibleDesigns = rankSingleGuidesWithRttConstraints({
-    guides,
-    targetStart: state.targetStart,
-    targetEnd: state.targetEnd,
-    referenceLength: record.length,
-    minimumRttLength,
-    preferredRttLength: state.preferredRtt,
-    maximumRttLength,
-  });
-
-  const assembledByDesign = new Map();
-  const pbsFeasibleDesigns = [];
-
-  for (const candidate of feasibleDesigns) {
-    try {
-      const assembled = designSinglePegrna(record.sequence, candidate.guide, candidate.rttLength, state.pbs);
-      pbsFeasibleDesigns.push(candidate);
-      assembledByDesign.set(candidate, assembled);
-    } catch (error) {
-      if (!(error instanceof SequenceParseError)) {
-        // infeasible for this guide only
-      }
-    }
-  }
-
-  const caption = `<div class="caption">Each RTT must fall within ${minimumRttLength}–${maximumRttLength} nt, shrinking automatically for guides too close to either end of the sequence to reach the preferred length.</div>`;
-
-  if (!pbsFeasibleDesigns.length) {
-    return { html: `${caption}<div class="warning-box">No guide satisfies the selected RTT and PBS constraints. Try widening the wiggle room or shortening the PBS.</div>`, download: null };
-  }
-
-  const selections = selectSynergisticSingleDesigns({
-    designs: pbsFeasibleDesigns,
-    targetStart: state.targetStart,
-    targetEnd: state.targetEnd,
-    maximumDesigns: state.maxDesigns,
-    forceMaximumDesigns: state.forceMax,
-  });
-
-  if (!selections.length) {
-    return { html: `${caption}<div class="warning-box">No feasible guide contributes coverage to the target.</div>`, download: null };
-  }
-
-  const cumulativeCoverage = selections[selections.length - 1].cumulativeCoveragePercent;
-
-  const rows = selections.map((selection, i) => ({
-    label: `Guide ${i + 1}`,
-    start: selection.design.coverage.guideIntervalStart,
-    end: selection.design.coverage.guideIntervalEnd,
-    // Only one edge is a true nick site -- the '+' strand's guide nicks
-    // at its left edge and synthesizes rightward; '-' is the mirror.
-    nickEdge: selection.design.guide.strand === "+" ? "left" : "right",
-  }));
-
-  const coveredIntervals = selections.map((s) => [
-    s.design.coverage.coveredStart,
-    s.design.coverage.coveredEnd,
-  ]);
-
-  const mapHtml = buildCoverageMapHtml({
+function buildMapBlock(record, leftGuides, rightGuides, state) {
+  const mapHtml = buildSpacerMapHtml({
     sequenceLength: record.length,
-    targetStart: state.targetStart,
-    targetEnd: state.targetEnd,
-    rows,
-    coveredIntervals,
-    coveragePercent: cumulativeCoverage,
+    leftGuides,
+    rightGuides,
+    selectedLeftIndex: state.selectedSide === "left" ? state.selectedIndex : null,
+    selectedRightIndex: state.selectedSide === "right" ? state.selectedIndex : null,
+    overlapRange: null,
   });
 
-  const csvRows = [];
+  return `
+    <div class="label">Guide map</div>
+    ${mapHtml}
+    <button class="btn btn-ghost btn-sm" id="clear-pick-btn" style="width:fit-content;">Clear pick</button>
+  `;
+}
 
-  const cardsHtml = selections
-    .map((selection, i) => {
-      const assembled = assembledByDesign.get(selection.design);
-      const guide = selection.design.guide;
-      const setNumber = i + 1;
-
-      csvRows.push(
-        pegrnaSideRow(
-          {
-            set: setNumber,
-            new_bases: selection.marginalCoveredLength,
-            cumulative_coverage_percent: selection.cumulativeCoveragePercent.toFixed(1),
-          },
-          "",
-          assembled
-        )
-      );
-
-      return buildPegrnaCardHtml({
-        setNumber,
-        headerRight: [
-          { label: "New bases", value: String(selection.marginalCoveredLength) },
-          { label: "Cumulative", value: `${selection.cumulativeCoveragePercent.toFixed(1)}%`, teal: true },
+/** One pegRNA card, shared between the live (unsaved) preview and each
+ * saved set below it. */
+function buildSingleCardHtml({ setNumber, design, actions }) {
+  const guide = design.guide;
+  return buildPegrnaCardHtml({
+    setNumber,
+    headerRight: [{ label: "RTT", value: `${design.rttLength} nt` }],
+    actions,
+    sides: [
+      {
+        title: "pegRNA",
+        badge: guide.strand,
+        stats: [
+          { label: "PAM", value: guide.pam },
+          { label: "Nick", value: String(guide.nickPosition) },
         ],
-        sides: [
-          {
-            title: "pegRNA",
-            badge: guide.strand,
-            stats: [
-              { label: "Spacer", value: assembled.spacerSequence },
-              { label: "PAM", value: guide.pam },
-              { label: "Nick", value: String(guide.nickPosition) },
-              { label: "PBS", value: assembled.pbsSequence },
-            ],
-            spacer: assembled.spacerSequence,
-            rtt: assembled.rttSequence,
-            pbs: assembled.pbsSequence,
-            lengthNt: assembled.fullLength,
-          },
-        ],
-      });
-    })
+        spacer: design.spacerSequence,
+        rtt: design.rttSequence,
+        pbs: design.pbsSequence,
+        lengthNt: design.fullLength,
+      },
+    ],
+  });
+}
+
+function buildSavedSetsBlock(record, state) {
+  if (!state.savedSets.length) return { html: "", download: null };
+
+  const cardsHtml = state.savedSets
+    .map((design, i) =>
+      buildSingleCardHtml({
+        setNumber: i + 1,
+        design,
+        actions: `<button class="btn btn-ghost btn-sm" data-remove-set-index="${i}">Remove</button>`,
+      })
+    )
     .join("");
 
-  const download = {
-    filename: `errpresso_single-pegrna_${slugify(record.recordId)}.csv`,
-    rows: csvRows,
-    columns: CSV_COLUMNS,
-  };
+  const rows = state.savedSets.map((design, i) => pegrnaSideRow({ set: i + 1 }, "", design));
 
   const html = `
-    <div class="label">Joint coverage map</div>
-    ${mapHtml}
-
-    <div class="stat-grid">
-      <div class="stat-card"><div class="label">Guides selected</div><div class="stat-value">${selections.length}</div></div>
-      <div class="stat-card"><div class="label">Target covered</div><div class="stat-value teal">${cumulativeCoverage.toFixed(1)}%</div></div>
-      <div class="stat-card"><div class="label">Candidate guides</div><div class="stat-value">${pbsFeasibleDesigns.length.toLocaleString()}</div></div>
-    </div>
-
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-      <div class="label">Designs</div>
+      <div class="label">Saved sets · ${state.savedSets.length}</div>
       <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
         ${buildPegrnaLegendHtml()}
         ${downloadCsvButtonHtml("download-csv-btn")}
       </div>
     </div>
-
     <div style="display: flex; flex-direction: column; gap: 14px;">
       ${cardsHtml}
     </div>
-
-    <div class="caption">All displayed designs use a ${state.pbs}-nt PBS.</div>
   `;
 
-  return { html, download };
+  return {
+    html,
+    download: {
+      filename: `errpresso_single-pegrna_${slugify(record.recordId)}.csv`,
+      rows,
+      columns: CSV_COLUMNS,
+    },
+  };
+}
+
+function renderMain(record, leftGuides, rightGuides, state) {
+  const savedBlock = buildSavedSetsBlock(record, state);
+  const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state);
+
+  if (state.selectedSide === null) {
+    return {
+      html: `${mapBlock}<div class="caption">Pick one triangle above or below the line to choose a guide.</div>${savedBlock.html}`,
+      download: savedBlock.download,
+    };
+  }
+
+  const { design, error } = resolveCurrentDesign(record, leftGuides, rightGuides, state);
+
+  if (!design) {
+    return {
+      html: `${mapBlock}<div class="warning-box">${error.message}</div>${savedBlock.html}`,
+      download: savedBlock.download,
+    };
+  }
+
+  const resultHtml = `
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+      <div class="label">Single pegRNA design</div>
+      ${buildPegrnaLegendHtml()}
+    </div>
+    ${design.rttLength > 80 ? '<div class="warning-box">The RTT is longer than 80 nt. Long RTT designs may require additional experimental validation.</div>' : ""}
+    ${buildSingleCardHtml({
+      setNumber: null,
+      design,
+      actions: `<button class="btn btn-primary btn-sm" id="save-set-btn">Save as set</button>`,
+    })}
+  `;
+
+  return {
+    html: `${mapBlock}${resultHtml}${savedBlock.html}`,
+    download: savedBlock.download,
+  };
 }
