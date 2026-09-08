@@ -701,6 +701,12 @@ details.guide-details .data-table-wrap {
   position: relative;
   height: 110px;
   margin-top: 16px;
+  /* Matches coverageMap.js's GUTTER (58px, reserved there for its row
+     badges/"Target"/"Covered" labels) so the two components' "0" tick
+     lines up exactly when a spacer map and a coverage track are
+     stacked directly on top of each other, e.g. Manual pair's guide
+     map above its saved-sets coverage track. */
+  margin-left: 58px;
 }
 .spacer-map-gridlines {
   position: absolute;
@@ -817,6 +823,7 @@ details.guide-details .data-table-wrap {
   position: relative;
   height: 14px;
   margin-top: 6px;
+  margin-left: 58px; /* keep the ruler's own "0" under the track's, see .spacer-map-track */
 }
 .spacer-map-tick {
   position: absolute;
@@ -830,6 +837,7 @@ details.guide-details .data-table-wrap {
   position: relative;
   height: 16px;
   margin-top: 6px;
+  margin-left: 58px; /* keep this row's own "0" under the track's, see .spacer-map-track */
 }
 .spacer-map-exon-bracket {
   position: absolute;
