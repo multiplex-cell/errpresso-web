@@ -1,10 +1,13 @@
-// Graphical joint-coverage track: numbered rows with rounded pill spans,
-// a teal overlap/footprint segment, inward-pointing nick markers, a
-// target band, a merged coverage bar, and a ruler with gridlines.
+// Graphical joint-coverage track: numbered rows drawn the same way the
+// Manual pair spacer map draws a pair -- a thin connector line between
+// two strand-colored triangles (pointing the same way a '+'/'-' guide's
+// triangle points on the spacer map), a teal overlap segment on top of
+// it, a target band, a merged coverage bar, and a ruler with gridlines.
 
 import { mergeIntervals } from "../../core/intervals.js";
 
 const GUTTER = 58; // px reserved for the row-label gutter (badge + gap)
+const TRI_SIZE = 12; // px, matches the spacer map's legend-icon triangle size
 
 function toPercent(coordinate, sequenceLength) {
   if (sequenceLength <= 0) return 0;
@@ -16,25 +19,23 @@ function rowNumber(label) {
   return match ? match[1] : label;
 }
 
-// Small CSS-triangle nick marker, pointing into the pill from the given
-// edge -- visual shorthand for "this is where the guide actually cuts".
-// Colored by strand the same way the spacer orientation map colors its
-// guide triangles: left/'+' in accent, right/'-' in teal.
-function nickMarker(edge) {
-  const common = "position:absolute;top:50%;transform:translateY(-50%);width:0;height:0;";
-  if (edge === "left") {
-    return `<div style="${common}left:-1px;border-top:3px solid transparent;border-bottom:3px solid transparent;border-left:4px solid var(--accent);"></div>`;
-  }
-  return `<div style="${common}right:-1px;border-top:3px solid transparent;border-bottom:3px solid transparent;border-right:4px solid var(--teal);"></div>`;
+// Small triangle nick marker at the given edge, centered on `pct` -- the
+// exact same glyph and orientation convention as the spacer map's guide
+// triangles: left/'+' points right (in accent), right/'-' points left
+// (in teal), so a pegRNA's nick reads identically in both places.
+function nickTriangle(edge, pct) {
+  const points = edge === "left" ? "1,1 11,6 1,11" : "11,1 1,6 11,11";
+  const color = edge === "left" ? "var(--accent)" : "var(--teal)";
+  return `
+    <div style="position:absolute;left:${pct}%;top:50%;transform:translate(-50%,-50%);line-height:0;">
+      <svg width="${TRI_SIZE}" height="${TRI_SIZE}" viewBox="0 0 12 12"><polygon points="${points}" fill="${color}"></polygon></svg>
+    </div>`;
 }
 
 // Plain end-cap for a non-nick edge (e.g. where a single guide's RTT
 // simply stops) -- a quiet tick, not a marker.
-function endCap(edge) {
-  const common = "position:absolute;top:1px;bottom:1px;width:2px;border-radius:1px;background:var(--accent-line);";
-  return edge === "left"
-    ? `<div style="${common}left:0;"></div>`
-    : `<div style="${common}right:0;"></div>`;
+function endCap(pct) {
+  return `<div style="position:absolute;left:${pct}%;top:50%;transform:translate(-50%,-50%);width:2px;height:10px;border-radius:1px;background:var(--accent-line);"></div>`;
 }
 
 /**
@@ -75,20 +76,20 @@ export function buildCoverageMapHtml({
         const overlapLeft = toPercent(row.overlapStart, sequenceLength);
         const overlapRight = toPercent(row.overlapEnd, sequenceLength);
         const overlapWidth = Math.max(0.3, overlapRight - overlapLeft);
-        overlapHtml = `<div style="position:absolute;left:${overlapLeft}%;width:${overlapWidth}%;top:0;bottom:0;border-radius:999px;background:var(--teal);opacity:0.85;"></div>`;
+        overlapHtml = `<div style="position:absolute;left:${overlapLeft}%;width:${overlapWidth}%;top:calc(50% - 2px);height:4px;border-radius:999px;background:var(--teal);z-index:1;"></div>`;
       }
 
       const markers =
-        (nickEdge === "left" || nickEdge === "both" ? nickMarker("left") : endCap("left")) +
-        (nickEdge === "right" || nickEdge === "both" ? nickMarker("right") : endCap("right"));
+        (nickEdge === "left" || nickEdge === "both" ? nickTriangle("left", left) : endCap(left)) +
+        (nickEdge === "right" || nickEdge === "both" ? nickTriangle("right", right) : endCap(right));
 
       return `
-        <div style="display:flex;align-items:center;gap:10px;height:14px;">
+        <div style="display:flex;align-items:center;gap:10px;height:16px;">
           <span class="mono" style="width:${GUTTER - 10}px;flex-shrink:0;display:flex;align-items:center;justify-content:center;height:13px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:9px;font-weight:700;">${rowNumber(row.label)}</span>
-          <div style="position:relative;flex:1;height:8px;">
-            <div style="position:absolute;left:${left}%;width:${width}%;top:0;bottom:0;border-radius:999px;background:var(--accent-soft);border:1px solid var(--accent-line);box-shadow:0 1px 2px oklch(0% 0 0 / 0.05);"></div>
-            <div style="position:absolute;left:${left}%;width:${width}%;top:0;bottom:0;">${markers}</div>
+          <div style="position:relative;flex:1;height:${TRI_SIZE}px;">
+            <div style="position:absolute;left:${left}%;width:${width}%;top:calc(50% - 1px);height:2px;border-radius:999px;background:var(--accent-line);"></div>
             ${overlapHtml}
+            ${markers}
           </div>
         </div>`;
     })
@@ -168,9 +169,9 @@ export function buildCoverageMapHtml({
       </div>
 
       <div style="display:flex;align-items:center;gap:10px 20px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-soft);">
-        <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:8px;border-radius:3px;background:var(--accent-soft);border:1px solid var(--accent-line);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">nick span</span></div>
-        <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:8px;border-radius:3px;background:var(--teal);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">overlap / covered</span></div>
-        <div style="display:flex;align-items:center;gap:6px;"><span style="width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:5px solid var(--accent);display:inline-block;"></span><span style="width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-right:5px solid var(--teal);display:inline-block;margin-left:-2px;"></span><span style="font-size:12px;color:var(--text-muted);">nick site (+/&minus;)</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><span style="width:16px;height:2px;border-radius:999px;background:var(--accent-line);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">nick span</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:4px;border-radius:999px;background:var(--teal);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">overlap / covered</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><svg width="12" height="12" viewBox="0 0 12 12" style="color:var(--accent);"><polygon points="1,1 11,6 1,11" fill="currentColor"></polygon></svg><svg width="12" height="12" viewBox="0 0 12 12" style="color:var(--teal);margin-left:-4px;"><polygon points="11,1 1,6 11,11" fill="currentColor"></polygon></svg><span style="font-size:12px;color:var(--text-muted);">nick site (+/&minus;)</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:8px;border-radius:3px;background:var(--accent-soft);opacity:0.5;display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">target region</span></div>
       </div>
     </div>
