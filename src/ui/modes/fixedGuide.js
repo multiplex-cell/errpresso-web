@@ -115,6 +115,13 @@ export function renderFixedGuideMode({ record, guides, state, sidebarExtra, main
         const isSame = state.fixedSide === side && state.fixedIndex === index;
         state.fixedSide = isSame ? null : side;
         state.fixedIndex = isSame ? null : index;
+        if (!isSame) {
+          // Freshly picking a guide starts maxed out at every compatible
+          // partner pair -- the user narrows it down themselves from there.
+          const guide = (side === "left" ? leftGuides : rightGuides)[index];
+          const compatiblePairs = findPairsForFixedGuide(guides, guide);
+          state.pairCount = Math.max(1, Math.min(20, compatiblePairs.length));
+        }
         renderPartnerControls();
         recompute();
       });

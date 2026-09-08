@@ -42,6 +42,10 @@ function triangleMarker({ guide, side, index, selected, sequenceLength }) {
  * @param {{start: number, end: number}|null} [opts.overlapRange] -- the computed
  *   RTT overlap's reference coordinates, once a valid design exists for the
  *   selected pair. Drawn as a highlighted segment on the connector line.
+ * @param {{start: number, end: number}|null} [opts.singleReach] -- when only
+ *   one guide is picked (no pair), the reference interval its own RTT would
+ *   cover once a valid design exists -- drawn as a teal reach segment from
+ *   the picked triangle, the single-guide equivalent of the pair connector.
  */
 export function buildSpacerMapHtml({
   sequenceLength,
@@ -50,6 +54,7 @@ export function buildSpacerMapHtml({
   selectedLeftIndex,
   selectedRightIndex,
   overlapRange,
+  singleReach,
 }) {
   const leftMarkers = leftGuides
     .map((g, i) => triangleMarker({ guide: g, side: "left", index: i, selected: i === selectedLeftIndex, sequenceLength }))
@@ -97,6 +102,10 @@ export function buildSpacerMapHtml({
       <div class="spacer-map-connector ${inward ? "" : "invalid"}" style="left:${Math.min(lp, rp)}%;width:${Math.abs(rp - lp)}%;"></div>
       ${overlapHtml}
     `;
+  } else if ((left || right) && singleReach) {
+    const a = toPercent(singleReach.start, sequenceLength);
+    const b = toPercent(singleReach.end, sequenceLength);
+    connectorHtml = `<div class="spacer-map-connector reach" style="left:${Math.min(a, b)}%;width:${Math.max(0, Math.abs(b - a))}%;"></div>`;
   }
 
   return `

@@ -674,6 +674,11 @@ details.guide-details .data-table-wrap {
 .spacer-map-connector.invalid {
   background: var(--danger);
 }
+.spacer-map-connector.reach {
+  height: 4px;
+  top: calc(50% - 2px);
+  background: var(--teal);
+}
 .spacer-map-overlap {
   position: absolute;
   top: calc(50% - 2px);

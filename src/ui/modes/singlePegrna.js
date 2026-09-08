@@ -4,7 +4,7 @@
 // so later changes to PBS/RTT length don't retroactively change a set
 // you already saved.
 
-import { designSinglePegrna } from "../../core/singlePegrna.js";
+import { designSinglePegrna, guideEditInterval } from "../../core/singlePegrna.js";
 import { stepperFieldHtml, attachStepperField } from "../controls.js";
 import { buildSpacerMapHtml } from "../components/spacerMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
@@ -119,7 +119,7 @@ function resolveCurrentDesign(record, leftGuides, rightGuides, state) {
   }
 }
 
-function buildMapBlock(record, leftGuides, rightGuides, state) {
+function buildMapBlock(record, leftGuides, rightGuides, state, singleReach) {
   const mapHtml = buildSpacerMapHtml({
     sequenceLength: record.length,
     leftGuides,
@@ -127,6 +127,7 @@ function buildMapBlock(record, leftGuides, rightGuides, state) {
     selectedLeftIndex: state.selectedSide === "left" ? state.selectedIndex : null,
     selectedRightIndex: state.selectedSide === "right" ? state.selectedIndex : null,
     overlapRange: null,
+    singleReach,
   });
 
   return `
@@ -201,9 +202,9 @@ function buildSavedSetsBlock(record, state) {
 
 function renderMain(record, leftGuides, rightGuides, state) {
   const savedBlock = buildSavedSetsBlock(record, state);
-  const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state);
 
   if (state.selectedSide === null) {
+    const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, null);
     return {
       html: `${mapBlock}<div class="caption">Pick one triangle above or below the line to choose a guide.</div>${savedBlock.html}`,
       download: savedBlock.download,
@@ -213,11 +214,15 @@ function renderMain(record, leftGuides, rightGuides, state) {
   const { design, error } = resolveCurrentDesign(record, leftGuides, rightGuides, state);
 
   if (!design) {
+    const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, null);
     return {
       html: `${mapBlock}<div class="warning-box">${error.message}</div>${savedBlock.html}`,
       download: savedBlock.download,
     };
   }
+
+  const [reachStart, reachEnd] = guideEditInterval(design.guide, design.rttLength);
+  const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, { start: reachStart, end: reachEnd });
 
   const resultHtml = `
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
