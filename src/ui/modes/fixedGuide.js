@@ -29,7 +29,7 @@ function defaults() {
   return { fixedSide: null, fixedIndex: null, pairCount: 5, overlapLength: 30, pbs: 13 };
 }
 
-export function renderFixedGuideMode({ record, guides, state, sidebarExtra, mainContent }) {
+export function renderFixedGuideMode({ record, guides, state, sidebarExtra, mainContent, exonRange }) {
   Object.assign(state, { ...defaults(), ...state });
 
   const leftGuides = guides.filter((g) => g.strand === "+").sort((a, b) => a.nickPosition - b.nickPosition);
@@ -101,7 +101,7 @@ export function renderFixedGuideMode({ record, guides, state, sidebarExtra, main
   renderPartnerControls();
 
   function recompute() {
-    const { html, download } = renderMain(record, guides, leftGuides, rightGuides, state);
+    const { html, download } = renderMain(record, guides, leftGuides, rightGuides, state, exonRange);
     mainContent.innerHTML = html;
     wireDownloadButton(mainContent, download);
     attachListeners();
@@ -141,7 +141,7 @@ export function renderFixedGuideMode({ record, guides, state, sidebarExtra, main
   recompute();
 }
 
-function buildMapBlock(record, leftGuides, rightGuides, state) {
+function buildMapBlock(record, leftGuides, rightGuides, state, exonRange) {
   const mapHtml = buildSpacerMapHtml({
     sequenceLength: record.length,
     leftGuides,
@@ -149,6 +149,7 @@ function buildMapBlock(record, leftGuides, rightGuides, state) {
     selectedLeftIndex: state.fixedSide === "left" ? state.fixedIndex : null,
     selectedRightIndex: state.fixedSide === "right" ? state.fixedIndex : null,
     overlapRange: null,
+    exonRange,
   });
 
   return `
@@ -158,8 +159,8 @@ function buildMapBlock(record, leftGuides, rightGuides, state) {
   `;
 }
 
-function renderMain(record, guides, leftGuides, rightGuides, state) {
-  const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state);
+function renderMain(record, guides, leftGuides, rightGuides, state, exonRange) {
+  const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, exonRange);
 
   if (state.fixedSide === null) {
     return {
@@ -226,6 +227,7 @@ function renderMain(record, guides, leftGuides, rightGuides, state) {
     rows,
     coveredIntervals,
     coveragePercent,
+    exonRange,
   });
 
   const csvRows = [];

@@ -46,7 +46,7 @@ function defaults(record) {
   };
 }
 
-export function renderJointCoverageMode({ record, pairs, state, sidebarExtra, mainContent }) {
+export function renderJointCoverageMode({ record, pairs, state, sidebarExtra, mainContent, exonRange }) {
   Object.assign(state, { ...defaults(record), ...state });
 
   const maxPairDistance = pairs.length
@@ -127,7 +127,7 @@ export function renderJointCoverageMode({ record, pairs, state, sidebarExtra, ma
   });
 
   function recompute() {
-    const { html, download } = renderMain(record, pairs, state);
+    const { html, download } = renderMain(record, pairs, state, exonRange);
     mainContent.innerHTML = html;
     wireDownloadButton(mainContent, download);
   }
@@ -135,7 +135,7 @@ export function renderJointCoverageMode({ record, pairs, state, sidebarExtra, ma
   recompute();
 }
 
-function renderMain(record, pairs, state) {
+function renderMain(record, pairs, state, exonRange) {
   if (state.targetEnd <= state.targetStart) {
     return { html: `<div class="label">Joint coverage map</div><div class="warning-box">The target interval must contain at least one base.</div>`, download: null };
   }
@@ -224,6 +224,7 @@ function renderMain(record, pairs, state) {
     rows,
     coveredIntervals,
     coveragePercent: cumulativeCoverage,
+    exonRange,
   });
 
   const csvRows = [];

@@ -31,7 +31,7 @@ function defaults(record) {
   };
 }
 
-export function renderManualPairMode({ record, guides, state, sidebarExtra, mainContent }) {
+export function renderManualPairMode({ record, guides, state, sidebarExtra, mainContent, exonRange }) {
   Object.assign(state, { ...defaults(record), ...state });
 
   sidebarExtra.innerHTML = `
@@ -63,7 +63,7 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
   const rightGuides = guides.filter((g) => g.strand === "-").sort((a, b) => b.nickPosition - a.nickPosition);
 
   function recompute() {
-    const { html, download } = renderMain(record, leftGuides, rightGuides, state);
+    const { html, download } = renderMain(record, leftGuides, rightGuides, state, exonRange);
     mainContent.innerHTML = html;
     wireDownloadButton(mainContent, download);
     attachListeners();
@@ -161,7 +161,7 @@ function resolveCurrentDesign(record, leftGuides, rightGuides, state) {
   }
 }
 
-function buildMapBlock(record, leftGuides, rightGuides, state, overlapRange) {
+function buildMapBlock(record, leftGuides, rightGuides, state, overlapRange, exonRange) {
   const mapHtml = buildSpacerMapHtml({
     sequenceLength: record.length,
     leftGuides,
@@ -169,6 +169,7 @@ function buildMapBlock(record, leftGuides, rightGuides, state, overlapRange) {
     selectedLeftIndex: state.leftIndex,
     selectedRightIndex: state.rightIndex,
     overlapRange,
+    exonRange,
   });
 
   return `
@@ -255,12 +256,12 @@ function buildSavedSetsBlock(record, state) {
   };
 }
 
-function renderMain(record, leftGuides, rightGuides, state) {
+function renderMain(record, leftGuides, rightGuides, state, exonRange) {
   const savedBlock = buildSavedSetsBlock(record, state);
 
   if (state.leftIndex === null || state.rightIndex === null) {
     return {
-      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}<div class="caption">Pick one triangle above the line and one below to form a pair.</div>${savedBlock.html}`,
+      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null, exonRange)}<div class="caption">Pick one triangle above the line and one below to form a pair.</div>${savedBlock.html}`,
       download: savedBlock.download,
     };
   }
@@ -270,7 +271,7 @@ function renderMain(record, leftGuides, rightGuides, state) {
 
   if (left.nickPosition >= right.nickPosition) {
     return {
-      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}<div class="warning-box">The picked '+' guide isn't to the left of the picked '-' guide, so they can't form an inward-facing pair.</div>${savedBlock.html}`,
+      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null, exonRange)}<div class="warning-box">The picked '+' guide isn't to the left of the picked '-' guide, so they can't form an inward-facing pair.</div>${savedBlock.html}`,
       download: savedBlock.download,
     };
   }
@@ -310,15 +311,19 @@ function renderMain(record, leftGuides, rightGuides, state) {
 
   if (!design) {
     return {
-      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}${overlapStartField}<div class="warning-box">${error.message}</div>${savedBlock.html}`,
+      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null, exonRange)}${overlapStartField}<div class="warning-box">${error.message}</div>${savedBlock.html}`,
       download: savedBlock.download,
     };
   }
 
-  const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, {
-    start: design.plan.overlapStart,
-    end: design.plan.overlapEnd,
-  });
+  const mapBlock = buildMapBlock(
+    record,
+    leftGuides,
+    rightGuides,
+    state,
+    { start: design.plan.overlapStart, end: design.plan.overlapEnd },
+    exonRange
+  );
 
   const resultHtml = `
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">

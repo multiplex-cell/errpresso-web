@@ -41,8 +41,10 @@ export function defaultGeneState() {
  * Render the gene-fetch tab body into `container` and wire its controls.
  * `state` is a mutable object (defaultGeneState()) the caller persists
  * across re-renders. `rerender` re-renders the panel (and whatever else
- * the caller's landing page needs) after a state change. `onFetched(fastaText)`
- * is called once a sequence has been fetched successfully.
+ * the caller's landing page needs) after a state change.
+ * `onFetched(fastaText, exonRange)` is called once a sequence has been
+ * fetched successfully -- `exonRange` is `{start, end}`, the exon's own
+ * (0-based, half-open) coordinates within `fastaText`'s sequence.
  */
 export function renderGeneFetchPanel(container, state, rerender, onFetched) {
   const structure = state.structure;
@@ -196,7 +198,7 @@ export function renderGeneFetchPanel(container, state, rerender, onFetched) {
         downstream: state.downstream,
       });
       const fasta = `>${result.geneSymbol}_exon${result.exonNumber} ${result.description}\n${result.sequence}\n`;
-      onFetched(fasta);
+      onFetched(fasta, { start: result.exonOffsetStart, end: result.exonOffsetEnd });
     } catch (error) {
       if (error instanceof GeneFetchError) {
         state.fetchError = error.message;

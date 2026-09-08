@@ -824,6 +824,32 @@ details.guide-details .data-table-wrap {
   color: var(--text-faint);
 }
 
+/* ---- Exon annotation (from "Fetch by gene") ---- */
+
+.spacer-map-exon-row {
+  position: relative;
+  height: 16px;
+  margin-top: 6px;
+}
+.spacer-map-exon-bracket {
+  position: absolute;
+  top: 0;
+  height: 5px;
+  border: 1px solid var(--text-faint);
+  border-top: none;
+  border-radius: 0 0 2px 2px;
+}
+.spacer-map-exon-label {
+  position: absolute;
+  top: 6px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
 /* ---- Gene symbol autocomplete ---- */
 
 .gene-suggest-panel {

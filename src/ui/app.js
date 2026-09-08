@@ -39,6 +39,12 @@ const appState = {
   inputText: "",
   geneState: defaultGeneState(),
   filterLowQuality: true,
+  // {start, end} of the exon within the active sequence, only set right
+  // after a "Fetch by gene" fetch -- cleared by anything that could make
+  // it stale (a manual edit, a new upload, loading the example, "New
+  // sequence"). Consumed once per design as long as it's still a single
+  // record -- gene fetches never produce more than one.
+  geneExonRange: null,
 };
 
 const root = document.getElementById("app");
@@ -103,6 +109,7 @@ function renderLanding() {
   root.querySelector("#load-example-btn").addEventListener("click", () => {
     appState.inputTab = "paste";
     appState.inputText = EXAMPLE_FASTA;
+    appState.geneExonRange = null;
     renderLanding();
   });
 
@@ -117,6 +124,7 @@ function renderInputBody() {
     body.innerHTML = `<textarea class="seq-input" id="seq-textarea" placeholder=">my_locus&#10;ACGTACGTACGTACGTACGT...&#10;&#10;Raw DNA, FASTA, or FASTQ. Multi-record input is supported.">${escapeHtml(appState.inputText)}</textarea>`;
     body.querySelector("#seq-textarea").addEventListener("input", (e) => {
       appState.inputText = e.target.value;
+      appState.geneExonRange = null;
     });
   } else if (appState.inputTab === "upload") {
     body.innerHTML = `
@@ -128,14 +136,16 @@ function renderInputBody() {
       const file = e.target.files[0];
       if (!file) return;
       appState.inputText = await file.text();
+      appState.geneExonRange = null;
       appState.inputTab = "paste";
       renderLanding();
     });
   } else {
-    renderGeneFetchPanel(body, appState.geneState, renderLanding, (fastaText) => {
+    renderGeneFetchPanel(body, appState.geneState, renderLanding, (fastaText, exonRange) => {
       appState.geneState = defaultGeneState();
       appState.inputTab = "paste";
       appState.inputText = fastaText;
+      appState.geneExonRange = exonRange;
       renderLanding();
     });
   }
@@ -270,6 +280,7 @@ function renderWorkspace() {
 
   root.querySelector("#new-sequence-btn").addEventListener("click", () => {
     appState.records = null;
+    appState.geneExonRange = null;
     renderLanding();
   });
 
@@ -316,10 +327,15 @@ function renderWorkspace() {
     appState.modeState[appState.mode] = {};
   }
 
+  // Only ever set for a sequence fetched whole via "Fetch by gene" --
+  // meaningless once more than one record is in play.
+  const exonRange = appState.records.length === 1 ? appState.geneExonRange : null;
+
   activeMode.render({
     record,
     guides,
     pairs,
+    exonRange,
     state: appState.modeState[appState.mode],
     sidebarExtra,
     mainContent,

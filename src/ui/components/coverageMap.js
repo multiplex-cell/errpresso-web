@@ -52,6 +52,10 @@ function endCap(pct) {
  *   plain end-cap instead.
  * @param {Array<[number, number]>} opts.coveredIntervals -- already target-clipped
  * @param {number} opts.coveragePercent
+ * @param {{start: number, end: number}|null} [opts.exonRange] -- the exon's
+ *   own coordinates within the sequence, when it was fetched whole via
+ *   "Fetch by gene". Drawn as a small bracket row so people can see at a
+ *   glance where the exon sits relative to its flanks.
  */
 export function buildCoverageMapHtml({
   sequenceLength,
@@ -60,6 +64,7 @@ export function buildCoverageMapHtml({
   rows,
   coveredIntervals,
   coveragePercent,
+  exonRange,
 }) {
   const targetLeft = toPercent(targetStart, sequenceLength);
   const targetRight = toPercent(targetEnd, sequenceLength);
@@ -120,6 +125,19 @@ export function buildCoverageMapHtml({
     .map((t) => `<div class="spacer-map-gridline" style="${t.align === "right" ? "right:0;" : `left:${t.position}%;`}"></div>`)
     .join("");
 
+  let exonRowHtml = "";
+  if (exonRange) {
+    const exonLeft = toPercent(exonRange.start, sequenceLength);
+    const exonWidth = Math.max(0, toPercent(exonRange.end, sequenceLength) - exonLeft);
+    exonRowHtml = `
+      <div style="display:flex;align-items:center;gap:10px;margin-top:3px;">
+        <span style="width:${GUTTER - 10}px;font-size:10px;color:var(--text-faint);flex-shrink:0;text-align:center;">Exon</span>
+        <div style="position:relative;flex:1;height:5px;">
+          <div style="position:absolute;left:${exonLeft}%;width:${exonWidth}%;top:0;height:5px;border:1px solid var(--text-faint);border-top:none;border-radius:0 0 2px 2px;"></div>
+        </div>
+      </div>`;
+  }
+
   return `
     <div class="spacer-map">
       <div class="spacer-map-header" style="margin-bottom:10px;">
@@ -156,6 +174,7 @@ export function buildCoverageMapHtml({
               ${coveredHtml}
             </div>
           </div>
+          ${exonRowHtml}
 
           <div style="display:flex;align-items:center;gap:10px;margin-top:3px;">
             <span style="width:${GUTTER - 10}px;flex-shrink:0;"></span>

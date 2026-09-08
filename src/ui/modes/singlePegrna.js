@@ -28,7 +28,7 @@ function defaults(record) {
   };
 }
 
-export function renderSinglePegrnaMode({ record, guides, state, sidebarExtra, mainContent }) {
+export function renderSinglePegrnaMode({ record, guides, state, sidebarExtra, mainContent, exonRange }) {
   Object.assign(state, { ...defaults(record), ...state });
 
   sidebarExtra.innerHTML = `
@@ -53,7 +53,7 @@ export function renderSinglePegrnaMode({ record, guides, state, sidebarExtra, ma
   const rightGuides = guides.filter((g) => g.strand === "-").sort((a, b) => b.nickPosition - a.nickPosition);
 
   function recompute() {
-    const { html, download } = renderMain(record, leftGuides, rightGuides, state);
+    const { html, download } = renderMain(record, leftGuides, rightGuides, state, exonRange);
     mainContent.innerHTML = html;
     wireDownloadButton(mainContent, download);
     attachListeners();
@@ -119,7 +119,7 @@ function resolveCurrentDesign(record, leftGuides, rightGuides, state) {
   }
 }
 
-function buildMapBlock(record, leftGuides, rightGuides, state, singleReach) {
+function buildMapBlock(record, leftGuides, rightGuides, state, singleReach, exonRange) {
   const mapHtml = buildSpacerMapHtml({
     sequenceLength: record.length,
     leftGuides,
@@ -128,6 +128,7 @@ function buildMapBlock(record, leftGuides, rightGuides, state, singleReach) {
     selectedRightIndex: state.selectedSide === "right" ? state.selectedIndex : null,
     overlapRange: null,
     singleReach,
+    exonRange,
   });
 
   return `
@@ -200,11 +201,11 @@ function buildSavedSetsBlock(record, state) {
   };
 }
 
-function renderMain(record, leftGuides, rightGuides, state) {
+function renderMain(record, leftGuides, rightGuides, state, exonRange) {
   const savedBlock = buildSavedSetsBlock(record, state);
 
   if (state.selectedSide === null) {
-    const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, null);
+    const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, null, exonRange);
     return {
       html: `${mapBlock}<div class="caption">Pick one triangle above or below the line to choose a guide.</div>${savedBlock.html}`,
       download: savedBlock.download,
@@ -214,7 +215,7 @@ function renderMain(record, leftGuides, rightGuides, state) {
   const { design, error } = resolveCurrentDesign(record, leftGuides, rightGuides, state);
 
   if (!design) {
-    const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, null);
+    const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, null, exonRange);
     return {
       html: `${mapBlock}<div class="warning-box">${error.message}</div>${savedBlock.html}`,
       download: savedBlock.download,
@@ -222,7 +223,7 @@ function renderMain(record, leftGuides, rightGuides, state) {
   }
 
   const [reachStart, reachEnd] = guideEditInterval(design.guide, design.rttLength);
-  const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, { start: reachStart, end: reachEnd });
+  const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, { start: reachStart, end: reachEnd }, exonRange);
 
   const resultHtml = `
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">

@@ -46,6 +46,10 @@ function triangleMarker({ guide, side, index, selected, sequenceLength }) {
  *   one guide is picked (no pair), the reference interval its own RTT would
  *   cover once a valid design exists -- drawn as a teal reach segment from
  *   the picked triangle, the single-guide equivalent of the pair connector.
+ * @param {{start: number, end: number}|null} [opts.exonRange] -- the exon's
+ *   own coordinates within the sequence, when it was fetched whole via
+ *   "Fetch by gene". Drawn as a small bracket below the track so people
+ *   can see at a glance where the exon sits relative to its flanks.
  */
 export function buildSpacerMapHtml({
   sequenceLength,
@@ -55,6 +59,7 @@ export function buildSpacerMapHtml({
   selectedRightIndex,
   overlapRange,
   singleReach,
+  exonRange,
 }) {
   const leftMarkers = leftGuides
     .map((g, i) => triangleMarker({ guide: g, side: "left", index: i, selected: i === selectedLeftIndex, sequenceLength }))
@@ -108,6 +113,17 @@ export function buildSpacerMapHtml({
     connectorHtml = `<div class="spacer-map-connector reach" style="left:${Math.min(a, b)}%;width:${Math.max(0, Math.abs(b - a))}%;"></div>`;
   }
 
+  let exonHtml = "";
+  if (exonRange) {
+    const a = toPercent(exonRange.start, sequenceLength);
+    const b = toPercent(exonRange.end, sequenceLength);
+    exonHtml = `
+      <div class="spacer-map-exon-row">
+        <div class="spacer-map-exon-bracket" style="left:${a}%;width:${Math.max(0, b - a)}%;"></div>
+        <span class="spacer-map-exon-label" style="left:${a}%;">Exon</span>
+      </div>`;
+  }
+
   return `
     <div class="spacer-map">
       <div class="spacer-map-header">
@@ -124,6 +140,7 @@ export function buildSpacerMapHtml({
         <div class="spacer-map-row plus">${leftMarkers}</div>
         <div class="spacer-map-row minus">${rightMarkers}</div>
       </div>
+      ${exonHtml}
       <div class="spacer-map-ruler">${tickLabelsHtml}</div>
     </div>
   `;
