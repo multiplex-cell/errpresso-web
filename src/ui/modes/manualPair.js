@@ -1,5 +1,8 @@
 // Manual pair mode -- pick one '+' guide and one '-' guide from a
-// spatial orientation map to build a pair by hand.
+// spatial orientation map to build a pair by hand, then save it as a
+// set and keep picking. Saved sets accumulate below, each one frozen
+// at save time so later changes to PBS/overlap don't retroactively
+// change a set you already saved.
 
 import { makePair } from "../../core/pairs.js";
 import { designPairedPegrnas } from "../../core/pegrnaDesign.js";
@@ -14,7 +17,7 @@ import {
   wireDownloadButton,
 } from "../csvExport.js";
 
-const CSV_COLUMNS = [...PEGRNA_BASE_COLUMNS, { key: "overlap_length_nt", label: "overlap_length_nt" }];
+const CSV_COLUMNS = [{ key: "set", label: "set" }, ...PEGRNA_BASE_COLUMNS, { key: "overlap_length_nt", label: "overlap_length_nt" }];
 
 function defaults(record) {
   return {
@@ -24,6 +27,7 @@ function defaults(record) {
     leftIndex: null,
     rightIndex: null,
     overlapStart: null,
+    savedSets: [], // frozen {pair, design} snapshots, in save order
   };
 }
 
@@ -37,7 +41,7 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
       ${stepperFieldHtml({ id: "overlapLength", label: "RTT overlap length", value: state.overlapLength })}
       ${toggleHtml({ id: "centerOverlap", label: "Center overlap", checked: state.centerOverlap })}
     </div>
-    <div class="caption">Click a triangle above the line ('+' strand) and one below ('-' strand) to form a pair. Click a picked triangle again to clear it.</div>
+    <div class="caption">Click a triangle above the line ('+' strand) and one below ('-' strand) to form a pair, then save it as a set and pick the next one.</div>
   `;
 
   attachStepperField(sidebarExtra, "pbs", { min: 1, max: 30 }, (v) => {
@@ -62,10 +66,10 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
     const { html, download } = renderMain(record, leftGuides, rightGuides, state);
     mainContent.innerHTML = html;
     wireDownloadButton(mainContent, download);
-    attachPickerListeners();
+    attachListeners();
   }
 
-  function attachPickerListeners() {
+  function attachListeners() {
     mainContent.querySelectorAll("[data-picker-row]").forEach((row) => {
       row.addEventListener("click", () => {
         const side = row.dataset.side;
@@ -99,9 +103,62 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
         }
       );
     }
+
+    const saveBtn = mainContent.querySelector("#save-set-btn");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", () => {
+        const { pair, design } = resolveCurrentDesign(record, leftGuides, rightGuides, state);
+        if (!design) return;
+        state.savedSets.push({ pair, design });
+        state.leftIndex = null;
+        state.rightIndex = null;
+        state.overlapStart = null;
+        recompute();
+      });
+    }
+
+    mainContent.querySelectorAll("[data-remove-set-index]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.savedSets.splice(Number(btn.dataset.removeSetIndex), 1);
+        recompute();
+      });
+    });
   }
 
   recompute();
+}
+
+/** Resolve the pair + assembled design for whatever is currently picked,
+ * exactly the same computation renderMain uses for display -- shared so
+ * "Save as set" saves precisely what's on screen. */
+function resolveCurrentDesign(record, leftGuides, rightGuides, state) {
+  if (state.leftIndex === null || state.rightIndex === null) return { pair: null, design: null, error: null };
+
+  const left = leftGuides[state.leftIndex];
+  const right = rightGuides[state.rightIndex];
+  if (left.nickPosition >= right.nickPosition) return { pair: null, design: null, error: null };
+
+  const pair = makePair(left, right);
+  const nickDistance = pair.nickDistance;
+
+  let overlapStart = null;
+  if (!state.centerOverlap && state.overlapLength <= nickDistance) {
+    const centeredStart = pair.leftGuide.nickPosition + Math.floor((nickDistance - state.overlapLength) / 2);
+    overlapStart = state.overlapStart ?? centeredStart;
+  }
+
+  try {
+    const design = designPairedPegrnas(
+      record.sequence,
+      pair,
+      state.pbs,
+      state.overlapLength,
+      state.centerOverlap ? null : overlapStart
+    );
+    return { pair, design, error: null };
+  } catch (e) {
+    return { pair, design: null, error: e };
+  }
 }
 
 function buildMapBlock(record, leftGuides, rightGuides, state, overlapRange) {
@@ -121,11 +178,90 @@ function buildMapBlock(record, leftGuides, rightGuides, state, overlapRange) {
   `;
 }
 
+/** One pegRNA-pair card, shared between the live (unsaved) preview and
+ * each saved set below it. */
+function buildPairCardHtml({ setNumber, pair, design, actions }) {
+  return buildPegrnaCardHtml({
+    setNumber,
+    headerRight: [{ label: "Overlap", value: `${design.plan.overlapLength} nt` }],
+    actions,
+    sides: [
+      {
+        title: "Left pegRNA",
+        stats: [
+          { label: "PAM", value: design.left.guide.pam },
+          { label: "Nick", value: String(design.left.guide.nickPosition) },
+        ],
+        spacer: design.left.spacerSequence,
+        rtt: design.left.rttSequence,
+        pbs: design.left.pbsSequence,
+        lengthNt: design.left.fullLength,
+      },
+      {
+        title: "Right pegRNA",
+        stats: [
+          { label: "PAM", value: design.right.guide.pam },
+          { label: "Nick", value: String(design.right.guide.nickPosition) },
+        ],
+        spacer: design.right.spacerSequence,
+        rtt: design.right.rttSequence,
+        pbs: design.right.pbsSequence,
+        lengthNt: design.right.fullLength,
+      },
+    ],
+    footnote: `Nick interval ${pair.leftGuide.nickPosition}–${pair.rightGuide.nickPosition} · overlap ${design.plan.overlapStart}–${design.plan.overlapEnd}`,
+  });
+}
+
+function buildSavedSetsBlock(record, state) {
+  if (!state.savedSets.length) return { html: "", download: null };
+
+  const cardsHtml = state.savedSets
+    .map(({ pair, design }, i) =>
+      buildPairCardHtml({
+        setNumber: i + 1,
+        pair,
+        design,
+        actions: `<button class="btn btn-ghost btn-sm" data-remove-set-index="${i}">Remove</button>`,
+      })
+    )
+    .join("");
+
+  const rows = state.savedSets.flatMap(({ design }, i) => {
+    const extra = { set: i + 1, overlap_length_nt: design.plan.overlapLength };
+    return [pegrnaSideRow(extra, "Left", design.left), pegrnaSideRow(extra, "Right", design.right)];
+  });
+
+  const html = `
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+      <div class="label">Saved sets · ${state.savedSets.length}</div>
+      <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+        ${buildPegrnaLegendHtml()}
+        ${downloadCsvButtonHtml("download-csv-btn")}
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      ${cardsHtml}
+    </div>
+  `;
+
+  return {
+    html,
+    download: {
+      filename: `errpresso_manual-pair_${slugify(record.recordId)}.csv`,
+      rows,
+      columns: CSV_COLUMNS,
+    },
+  };
+}
+
 function renderMain(record, leftGuides, rightGuides, state) {
+  const savedBlock = buildSavedSetsBlock(record, state);
+
   if (state.leftIndex === null || state.rightIndex === null) {
     return {
-      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}<div class="caption">Pick one triangle above the line and one below to form a pair.</div>`,
-      download: null,
+      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}<div class="caption">Pick one triangle above the line and one below to form a pair.</div>${savedBlock.html}`,
+      download: savedBlock.download,
     };
   }
 
@@ -134,8 +270,8 @@ function renderMain(record, leftGuides, rightGuides, state) {
 
   if (left.nickPosition >= right.nickPosition) {
     return {
-      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}<div class="warning-box">The picked '+' guide isn't to the left of the picked '-' guide, so they can't form an inward-facing pair.</div>`,
-      download: null,
+      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}<div class="warning-box">The picked '+' guide isn't to the left of the picked '-' guide, so they can't form an inward-facing pair.</div>${savedBlock.html}`,
+      download: savedBlock.download,
     };
   }
 
@@ -174,8 +310,8 @@ function renderMain(record, leftGuides, rightGuides, state) {
 
   if (!design) {
     return {
-      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}${overlapStartField}<div class="warning-box">${error.message}</div>`,
-      download: null,
+      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}${overlapStartField}<div class="warning-box">${error.message}</div>${savedBlock.html}`,
+      download: savedBlock.download,
     };
   }
 
@@ -184,56 +320,23 @@ function renderMain(record, leftGuides, rightGuides, state) {
     end: design.plan.overlapEnd,
   });
 
-  const extra = { overlap_length_nt: design.plan.overlapLength };
-  const download = {
-    filename: `errpresso_manual-pair_${slugify(record.recordId)}.csv`,
-    rows: [pegrnaSideRow(extra, "Left", design.left), pegrnaSideRow(extra, "Right", design.right)],
-    columns: CSV_COLUMNS,
-  };
-
   const resultHtml = `
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
       <div class="label">Paired pegRNA design</div>
-      <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-        ${buildPegrnaLegendHtml()}
-        ${downloadCsvButtonHtml("download-csv-btn")}
-      </div>
+      ${buildPegrnaLegendHtml()}
     </div>
     ${design.plan.overlapLength === nickDistance ? '<div class="warning-box">The overlap covers the entire interval between the nick sites.</div>' : ""}
     ${Math.max(design.left.rttLength, design.right.rttLength) > 80 ? '<div class="warning-box">At least one RTT is longer than 80 nt. Long RTT designs may require additional experimental validation.</div>' : ""}
-    ${buildPegrnaCardHtml({
+    ${buildPairCardHtml({
       setNumber: null,
-      headerRight: [{ label: "Overlap", value: `${design.plan.overlapLength} nt` }],
-      sides: [
-        {
-          title: "Left pegRNA",
-          stats: [
-            { label: "PAM", value: design.left.guide.pam },
-            { label: "Nick", value: String(design.left.guide.nickPosition) },
-          ],
-          spacer: design.left.spacerSequence,
-          rtt: design.left.rttSequence,
-          pbs: design.left.pbsSequence,
-          lengthNt: design.left.fullLength,
-        },
-        {
-          title: "Right pegRNA",
-          stats: [
-            { label: "PAM", value: design.right.guide.pam },
-            { label: "Nick", value: String(design.right.guide.nickPosition) },
-          ],
-          spacer: design.right.spacerSequence,
-          rtt: design.right.rttSequence,
-          pbs: design.right.pbsSequence,
-          lengthNt: design.right.fullLength,
-        },
-      ],
-      footnote: `Nick interval ${pair.leftGuide.nickPosition}–${pair.rightGuide.nickPosition} · overlap ${design.plan.overlapStart}–${design.plan.overlapEnd}`,
+      pair,
+      design,
+      actions: `<button class="btn btn-primary btn-sm" id="save-set-btn">Save as set</button>`,
     })}
   `;
 
   return {
-    html: `${mapBlock}${overlapStartField}${resultHtml}`,
-    download,
+    html: `${mapBlock}${overlapStartField}${resultHtml}${savedBlock.html}`,
+    download: savedBlock.download,
   };
 }

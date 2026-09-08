@@ -31,7 +31,7 @@ const MODES = [
 const appState = {
   records: null,
   selectedRecordId: null,
-  mode: "joint",
+  mode: "manual",
   modeState: {}, // per-mode persisted params, keyed by mode id
   inputTab: "paste",
   inputText: "",
@@ -146,7 +146,7 @@ function handleDesignClick() {
     const records = parseSequenceText(appState.inputText);
     appState.records = records;
     appState.selectedRecordId = records[0].recordId;
-    appState.mode = "joint";
+    appState.mode = "manual";
     appState.modeState = {};
     renderWorkspace();
   } catch (error) {
@@ -264,7 +264,7 @@ function renderWorkspace() {
   if (showRecordSelector) {
     root.querySelector("#record-select").addEventListener("change", (e) => {
       appState.selectedRecordId = e.target.value;
-      appState.mode = "joint";
+      appState.mode = "manual";
       appState.modeState = {};
       renderWorkspace();
     });

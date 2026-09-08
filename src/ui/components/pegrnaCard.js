@@ -27,8 +27,9 @@ function fullSequenceBlockHtml({ spacer, rtt, pbs }) {
  *   spacer: string, rtt: string, pbs: string, lengthNt: number,
  * }>} opts.sides -- one entry for a single pegRNA, two for a pair (Left/Right)
  * @param {string} [opts.footnote]
+ * @param {string} [opts.actions] -- extra HTML (e.g. a button) appended after headerRight
  */
-export function buildPegrnaCardHtml({ setNumber, headerRight = [], sides, footnote }) {
+export function buildPegrnaCardHtml({ setNumber, headerRight = [], sides, footnote, actions = "" }) {
   const sidesHtml = sides
     .map(
       (side, index) => `
@@ -66,6 +67,7 @@ export function buildPegrnaCardHtml({ setNumber, headerRight = [], sides, footno
                 `<div style="font-size: 12.5px; color: var(--text-muted); white-space: nowrap;">${h.label} <span style="color: ${h.teal ? "var(--teal)" : "var(--text)"}; font-weight: ${h.teal ? "700" : "600"};">${h.value}</span></div>`
             )
             .join("")}
+          ${actions}
         </div>
       </div>
 
