@@ -104,24 +104,27 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
   recompute();
 }
 
-function renderMain(record, leftGuides, rightGuides, state) {
+function buildMapBlock(record, leftGuides, rightGuides, state, overlapRange) {
   const mapHtml = buildSpacerMapHtml({
     sequenceLength: record.length,
     leftGuides,
     rightGuides,
     selectedLeftIndex: state.leftIndex,
     selectedRightIndex: state.rightIndex,
+    overlapRange,
   });
 
-  const mapBlock = `
+  return `
     <div class="label">Guide map</div>
     ${mapHtml}
     <button class="btn btn-ghost btn-sm" id="clear-pick-btn" style="width:fit-content;">Clear left / right pick</button>
   `;
+}
 
+function renderMain(record, leftGuides, rightGuides, state) {
   if (state.leftIndex === null || state.rightIndex === null) {
     return {
-      html: `${mapBlock}<div class="caption">Pick one triangle above the line and one below to form a pair.</div>`,
+      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}<div class="caption">Pick one triangle above the line and one below to form a pair.</div>`,
       download: null,
     };
   }
@@ -131,7 +134,7 @@ function renderMain(record, leftGuides, rightGuides, state) {
 
   if (left.nickPosition >= right.nickPosition) {
     return {
-      html: `${mapBlock}<div class="warning-box">The picked '+' guide isn't to the left of the picked '-' guide, so they can't form an inward-facing pair.</div>`,
+      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}<div class="warning-box">The picked '+' guide isn't to the left of the picked '-' guide, so they can't form an inward-facing pair.</div>`,
       download: null,
     };
   }
@@ -170,8 +173,16 @@ function renderMain(record, leftGuides, rightGuides, state) {
   }
 
   if (!design) {
-    return { html: `${mapBlock}${overlapStartField}<div class="warning-box">${error.message}</div>`, download: null };
+    return {
+      html: `${buildMapBlock(record, leftGuides, rightGuides, state, null)}${overlapStartField}<div class="warning-box">${error.message}</div>`,
+      download: null,
+    };
   }
+
+  const mapBlock = buildMapBlock(record, leftGuides, rightGuides, state, {
+    start: design.plan.overlapStart,
+    end: design.plan.overlapEnd,
+  });
 
   const extra = { overlap_length_nt: design.plan.overlapLength };
   const download = {

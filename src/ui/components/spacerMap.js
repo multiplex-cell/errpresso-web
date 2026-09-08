@@ -39,8 +39,18 @@ function triangleMarker({ guide, side, index, selected, sequenceLength }) {
  * @param {Array} opts.rightGuides -- '-' strand guides, any order (index is the picker key)
  * @param {number|null} opts.selectedLeftIndex
  * @param {number|null} opts.selectedRightIndex
+ * @param {{start: number, end: number}|null} [opts.overlapRange] -- the computed
+ *   RTT overlap's reference coordinates, once a valid design exists for the
+ *   selected pair. Drawn as a highlighted segment on the connector line.
  */
-export function buildSpacerMapHtml({ sequenceLength, leftGuides, rightGuides, selectedLeftIndex, selectedRightIndex }) {
+export function buildSpacerMapHtml({
+  sequenceLength,
+  leftGuides,
+  rightGuides,
+  selectedLeftIndex,
+  selectedRightIndex,
+  overlapRange,
+}) {
   const leftMarkers = leftGuides
     .map((g, i) => triangleMarker({ guide: g, side: "left", index: i, selected: i === selectedLeftIndex, sequenceLength }))
     .join("");
@@ -75,7 +85,18 @@ export function buildSpacerMapHtml({ sequenceLength, leftGuides, rightGuides, se
     const lp = toPercent(left.nickPosition, sequenceLength);
     const rp = toPercent(right.nickPosition, sequenceLength);
     const inward = left.nickPosition < right.nickPosition;
-    connectorHtml = `<div class="spacer-map-connector ${inward ? "" : "invalid"}" style="left:${Math.min(lp, rp)}%;width:${Math.abs(rp - lp)}%;"></div>`;
+
+    let overlapHtml = "";
+    if (inward && overlapRange) {
+      const op = toPercent(overlapRange.start, sequenceLength);
+      const oq = toPercent(overlapRange.end, sequenceLength);
+      overlapHtml = `<div class="spacer-map-overlap" style="left:${op}%;width:${Math.max(0, oq - op)}%;"></div>`;
+    }
+
+    connectorHtml = `
+      <div class="spacer-map-connector ${inward ? "" : "invalid"}" style="left:${Math.min(lp, rp)}%;width:${Math.abs(rp - lp)}%;"></div>
+      ${overlapHtml}
+    `;
   }
 
   return `
