@@ -17,6 +17,7 @@ import {
 } from "../controls.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
+import { wireImageDownloadButtons } from "../imageExport.js";
 import {
   slugify,
   pegrnaSideRow,
@@ -130,6 +131,7 @@ export function renderJointCoverageMode({ record, pairs, state, sidebarExtra, ma
     const { html, download } = renderMain(record, pairs, state, exonRange);
     mainContent.innerHTML = html;
     wireDownloadButton(mainContent, download);
+    wireImageDownloadButtons(mainContent);
   }
 
   recompute();
@@ -225,6 +227,8 @@ function renderMain(record, pairs, state, exonRange) {
     coveredIntervals,
     coveragePercent: cumulativeCoverage,
     exonRange,
+    id: "coverage-track-joint",
+    filename: `errpresso_joint-coverage_${slugify(record.recordId)}.svg`,
   });
 
   const csvRows = [];

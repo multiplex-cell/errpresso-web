@@ -9,6 +9,7 @@ import { stepperFieldHtml, attachStepperField, singleSliderHtml, attachSingleSli
 import { buildSpacerMapHtml } from "../components/spacerMap.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
+import { wireImageDownloadButtons } from "../imageExport.js";
 import {
   slugify,
   pegrnaSideRow,
@@ -104,6 +105,7 @@ export function renderFixedGuideMode({ record, guides, state, sidebarExtra, main
     const { html, download } = renderMain(record, guides, leftGuides, rightGuides, state, exonRange);
     mainContent.innerHTML = html;
     wireDownloadButton(mainContent, download);
+    wireImageDownloadButtons(mainContent);
     attachListeners();
   }
 
@@ -228,6 +230,8 @@ function renderMain(record, guides, leftGuides, rightGuides, state, exonRange) {
     coveredIntervals,
     coveragePercent,
     exonRange,
+    id: "coverage-track-fixed",
+    filename: `errpresso_fixed-guide_${slugify(record.recordId)}.svg`,
   });
 
   const csvRows = [];

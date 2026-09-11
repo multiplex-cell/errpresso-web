@@ -5,6 +5,7 @@
 // it, a target band, a merged coverage bar, and a ruler with gridlines.
 
 import { mergeIntervals } from "../../core/intervals.js";
+import { ICONS } from "../icons.js";
 
 const GUTTER = 58; // px reserved for the row-label gutter (badge + gap)
 const TRI_SIZE = 12; // px, matches the spacer map's legend-icon triangle size
@@ -26,9 +27,14 @@ function rowNumber(label) {
 function nickTriangle(edge, pct) {
   const points = edge === "left" ? "1,1 11,6 1,11" : "11,1 1,6 11,11";
   const color = edge === "left" ? "var(--accent)" : "var(--teal)";
+  // data-tri-dir marks which way this triangle visually points -- inert
+  // on screen, but imageExport.js keys off it to swap this <svg> for a
+  // plain CSS triangle in an exported copy (a nested <svg> inside a
+  // <foreignObject> doesn't render at all once the exported document's
+  // own root element is SVG -- a real, narrow Chromium limitation).
   return `
     <div style="position:absolute;left:${pct}%;top:50%;transform:translate(-50%,-50%);line-height:0;">
-      <svg width="${TRI_SIZE}" height="${TRI_SIZE}" viewBox="0 0 12 12"><polygon points="${points}" fill="${color}"></polygon></svg>
+      <svg width="${TRI_SIZE}" height="${TRI_SIZE}" viewBox="0 0 12 12" data-tri-dir="${edge === "left" ? "right" : "left"}"><polygon points="${points}" fill="${color}"></polygon></svg>
     </div>`;
 }
 
@@ -56,6 +62,9 @@ function endCap(pct) {
  *   own coordinates within the sequence, when it was fetched whole via
  *   "Fetch by gene". Drawn as a small bracket row so people can see at a
  *   glance where the exon sits relative to its flanks.
+ * @param {string} [opts.id] -- element id, unique among whatever else is on
+ *   the page at once -- also the "Download image" button's export target.
+ * @param {string} [opts.filename] -- filename for that SVG download.
  */
 export function buildCoverageMapHtml({
   sequenceLength,
@@ -65,6 +74,8 @@ export function buildCoverageMapHtml({
   coveredIntervals,
   coveragePercent,
   exonRange,
+  id = "coverage-track",
+  filename = "errpresso-coverage-track.svg",
 }) {
   const targetLeft = toPercent(targetStart, sequenceLength);
   const targetRight = toPercent(targetEnd, sequenceLength);
@@ -139,12 +150,22 @@ export function buildCoverageMapHtml({
   }
 
   return `
-    <div class="spacer-map">
+    <div class="spacer-map" id="${id}">
       <div class="spacer-map-header" style="margin-bottom:10px;">
         <div class="spacer-map-label">Coverage track</div>
-        <div style="display:flex;align-items:baseline;gap:6px;white-space:nowrap;">
-          <span style="font-size:20px;font-weight:700;color:var(--teal);letter-spacing:-0.01em;">${coveragePercent.toFixed(1)}%</span>
-          <span style="font-size:11.5px;color:var(--text-faint);">of target</span>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="display:flex;align-items:baseline;gap:6px;white-space:nowrap;">
+            <span style="font-size:20px;font-weight:700;color:var(--teal);letter-spacing:-0.01em;">${coveragePercent.toFixed(1)}%</span>
+            <span style="font-size:11.5px;color:var(--text-faint);">of target</span>
+          </div>
+          <button
+            class="btn btn-ghost btn-sm"
+            data-export-exclude
+            data-image-download
+            data-image-target="${id}"
+            data-image-filename="${filename}"
+            style="padding:4px 10px;font-size:11.5px;"
+          >${ICONS.download} Save image</button>
         </div>
       </div>
 
@@ -190,7 +211,7 @@ export function buildCoverageMapHtml({
       <div style="display:flex;align-items:center;gap:10px 20px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-soft);">
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:16px;height:2px;border-radius:999px;background:var(--accent-line);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">nick span</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:4px;border-radius:999px;background:var(--teal);display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">overlap / covered</span></div>
-        <div style="display:flex;align-items:center;gap:6px;"><svg width="12" height="12" viewBox="0 0 12 12" style="color:var(--accent);"><polygon points="1,1 11,6 1,11" fill="currentColor"></polygon></svg><svg width="12" height="12" viewBox="0 0 12 12" style="color:var(--teal);margin-left:-4px;"><polygon points="11,1 1,6 11,11" fill="currentColor"></polygon></svg><span style="font-size:12px;color:var(--text-muted);">nick site (+/&minus;)</span></div>
+        <div style="display:flex;align-items:center;gap:6px;"><svg width="12" height="12" viewBox="0 0 12 12" data-tri-dir="right" style="color:var(--accent);"><polygon points="1,1 11,6 1,11" fill="currentColor"></polygon></svg><svg width="12" height="12" viewBox="0 0 12 12" data-tri-dir="left" style="color:var(--teal);margin-left:-4px;"><polygon points="11,1 1,6 11,11" fill="currentColor"></polygon></svg><span style="font-size:12px;color:var(--text-muted);">nick site (+/&minus;)</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:8px;border-radius:3px;background:var(--accent-soft);opacity:0.5;display:inline-block;"></span><span style="font-size:12px;color:var(--text-muted);">target region</span></div>
       </div>
     </div>

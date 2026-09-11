@@ -11,6 +11,7 @@ import { stepperFieldHtml, attachStepperField, toggleHtml, attachToggle } from "
 import { buildSpacerMapHtml } from "../components/spacerMap.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
+import { wireImageDownloadButtons } from "../imageExport.js";
 import {
   slugify,
   pegrnaSideRow,
@@ -68,6 +69,7 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
     const { html, download } = renderMain(record, leftGuides, rightGuides, state, exonRange);
     mainContent.innerHTML = html;
     wireDownloadButton(mainContent, download);
+    wireImageDownloadButtons(mainContent);
     attachListeners();
   }
 
@@ -258,6 +260,8 @@ function buildSavedSetsBlock(record, state, exonRange) {
     coveredIntervals,
     coveragePercent,
     exonRange,
+    id: "coverage-track-manual",
+    filename: `errpresso_manual-pair-saved-sets_${slugify(record.recordId)}.svg`,
   });
 
   const html = `
