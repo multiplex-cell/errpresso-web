@@ -194,6 +194,7 @@ function buildPairCardHtml({ setNumber, pair, design, actions }) {
       {
         title: "Left pegRNA",
         stats: [
+          { label: "Spacer", value: design.left.spacerSequence },
           { label: "PAM", value: design.left.guide.pam },
           { label: "Nick", value: String(design.left.guide.nickPosition) },
           { label: "RTT", value: `${design.left.rttLength} nt` },
@@ -206,6 +207,7 @@ function buildPairCardHtml({ setNumber, pair, design, actions }) {
       {
         title: "Right pegRNA",
         stats: [
+          { label: "Spacer", value: design.right.spacerSequence },
           { label: "PAM", value: design.right.guide.pam },
           { label: "Nick", value: String(design.right.guide.nickPosition) },
           { label: "RTT", value: `${design.right.rttLength} nt` },
