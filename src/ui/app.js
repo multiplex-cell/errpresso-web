@@ -6,6 +6,7 @@ import { parseSequenceText, SequenceParseError } from "../core/sequenceIo.js";
 import { findSpCas9Guides } from "../core/guides.js";
 import { findInwardFacingPairs } from "../core/pairs.js";
 import { filterQualityGuides } from "../core/guideQuality.js";
+import { applyG19ToGuides } from "../core/spacerEngineering.js";
 import { ICONS, logoMarkSvg } from "./icons.js";
 import { escapeHtml } from "./domUtils.js";
 import { toggleHtml, attachToggle } from "./controls.js";
@@ -39,6 +40,7 @@ const appState = {
   inputText: "",
   geneState: defaultGeneState(),
   filterLowQuality: true,
+  useG19Spacer: false,
   // {start, end} of the exon within the active sequence, only set right
   // after a "Fetch by gene" fetch -- cleared by anything that could make
   // it stale (a manual edit, a new upload, loading the example, "New
@@ -239,7 +241,10 @@ function renderWorkspace() {
   }
 
   const allGuides = findSpCas9Guides(record.sequence);
-  const guides = appState.filterLowQuality ? filterQualityGuides(allGuides) : allGuides;
+  // G+19 first, if on, so the quality filter judges the spacer that
+  // would actually be synthesized rather than the untouched original.
+  const engineeredGuides = appState.useG19Spacer ? applyG19ToGuides(allGuides) : allGuides;
+  const guides = appState.filterLowQuality ? filterQualityGuides(engineeredGuides) : engineeredGuides;
 
   const showRecordSelector = appState.records.length > 1;
 
@@ -263,12 +268,18 @@ function renderWorkspace() {
       <div class="workspace">
         <div class="sidebar" id="sidebar">
           ${renderModeNav()}
-          <div id="quality-filter-row">
+          <div id="quality-filter-row" style="display:flex;flex-direction:column;gap:14px;">
             ${toggleHtml({
               id: "filterLowQuality",
               label: "Filter low-quality spacers",
               checked: appState.filterLowQuality,
               info: "Hides guides with a poly-T (TTTT+) run, GC% outside 30–70%, or a 5+ base homopolymer run.",
+            })}
+            ${toggleHtml({
+              id: "useG19Spacer",
+              label: "Use G+19 spacers",
+              checked: appState.useG19Spacer,
+              info: "Improves U6 (Pol III) transcription. Replaces each spacer's 5' (PAM-distal) base with a synthetic G, keeping the PAM-proximal 19 nt -- the ones that matter most for targeting -- unchanged. Spacers already starting with G are untouched.",
             })}
           </div>
           <div id="mode-sidebar-extra"></div>
@@ -305,6 +316,15 @@ function renderWorkspace() {
     // The guide pool changed shape -- any picked/saved indices in mode
     // state could now silently point at a different guide, so reset
     // per-mode state the same way switching sequences already does.
+    appState.modeState = {};
+    renderWorkspace();
+  });
+
+  attachToggle(root, "useG19Spacer", (checked) => {
+    appState.useG19Spacer = checked;
+    // Doesn't reshape the guide list (1:1, same order), but it can
+    // change which guides the quality filter passes -- reset for the
+    // same reason as filterLowQuality above.
     appState.modeState = {};
     renderWorkspace();
   });
