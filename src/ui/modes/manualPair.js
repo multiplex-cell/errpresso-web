@@ -7,11 +7,13 @@
 import { makePair } from "../../core/pairs.js";
 import { designPairedPegrnas } from "../../core/pegrnaDesign.js";
 import { intervalsLength } from "../../core/intervals.js";
+import { designBlockingMutations, applyBlockingMutations } from "../../core/pamBlocking.js";
 import { stepperFieldHtml, attachStepperField, toggleHtml, attachToggle } from "../controls.js";
 import { buildSpacerMapHtml } from "../components/spacerMap.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
 import { wireImageDownloadButtons } from "../imageExport.js";
+import { escapeHtml } from "../domUtils.js";
 import {
   slugify,
   pegrnaSideRow,
@@ -20,7 +22,19 @@ import {
   wireDownloadButton,
 } from "../csvExport.js";
 
-const CSV_COLUMNS = [{ key: "set", label: "set" }, ...PEGRNA_BASE_COLUMNS, { key: "overlap_length_nt", label: "overlap_length_nt" }];
+const CSV_COLUMNS = [
+  { key: "set", label: "set" },
+  ...PEGRNA_BASE_COLUMNS,
+  { key: "overlap_length_nt", label: "overlap_length_nt" },
+  { key: "blocking_mutations", label: "blocking_mutations" },
+];
+
+const BLOCKING_REGION_LABELS = {
+  none: "None",
+  pam: "Destroy PAM",
+  seed: "Disrupt seed (3 nt)",
+  both: "Both",
+};
 
 function defaults(record) {
   return {
@@ -30,11 +44,12 @@ function defaults(record) {
     leftIndex: null,
     rightIndex: null,
     overlapStart: null,
-    savedSets: [], // frozen {pair, design} snapshots, in save order
+    blockingRegion: "none", // "none" | "pam" | "seed" | "both"
+    savedSets: [], // frozen {pair, design, mutations} snapshots, in save order
   };
 }
 
-export function renderManualPairMode({ record, guides, state, sidebarExtra, mainContent, exonRange }) {
+export function renderManualPairMode({ record, guides, state, sidebarExtra, mainContent, exonRange, cdsRange }) {
   Object.assign(state, { ...defaults(record), ...state });
 
   sidebarExtra.innerHTML = `
@@ -43,6 +58,21 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
       ${stepperFieldHtml({ id: "pbs", label: "PBS length", value: state.pbs })}
       ${stepperFieldHtml({ id: "overlapLength", label: "RTT overlap length", value: state.overlapLength })}
       ${toggleHtml({ id: "centerOverlap", label: "Center overlap", checked: state.centerOverlap })}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="label">Blocking mutation</div>
+      <select id="blocking-region-select" class="field" style="width:100%;">
+        ${Object.entries(BLOCKING_REGION_LABELS)
+          .map(([value, label]) => `<option value="${value}" ${state.blockingRegion === value ? "selected" : ""}>${label}</option>`)
+          .join("")}
+      </select>
+      <div class="caption">
+        ${
+          cdsRange
+            ? "A CDS is assigned -- mutations are kept silent (same amino acid) wherever a position falls inside it."
+            : "No CDS assigned on the landing page -- mutations aren't checked for silence, they just disrupt the sequence."
+        }
+      </div>
     </div>
     <div class="caption">Click a triangle above the line ('+' strand) and one below ('-' strand) to form a pair, then save it as a set and pick the next one.</div>
   `;
@@ -61,12 +91,16 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
     state.overlapStart = null;
     recompute();
   });
+  sidebarExtra.querySelector("#blocking-region-select").addEventListener("change", (e) => {
+    state.blockingRegion = e.target.value;
+    recompute();
+  });
 
   const leftGuides = guides.filter((g) => g.strand === "+").sort((a, b) => a.nickPosition - b.nickPosition);
   const rightGuides = guides.filter((g) => g.strand === "-").sort((a, b) => b.nickPosition - a.nickPosition);
 
   function recompute() {
-    const { html, download } = renderMain(record, leftGuides, rightGuides, state, exonRange);
+    const { html, download } = renderMain(record, leftGuides, rightGuides, state, exonRange, cdsRange);
     mainContent.innerHTML = html;
     wireDownloadButton(mainContent, download);
     wireImageDownloadButtons(mainContent);
@@ -111,9 +145,9 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
     const saveBtn = mainContent.querySelector("#save-set-btn");
     if (saveBtn) {
       saveBtn.addEventListener("click", () => {
-        const { pair, design } = resolveCurrentDesign(record, leftGuides, rightGuides, state);
+        const { pair, design, mutations } = resolveCurrentDesign(record, leftGuides, rightGuides, state, cdsRange);
         if (!design) return;
-        state.savedSets.push({ pair, design });
+        state.savedSets.push({ pair, design, mutations });
         state.leftIndex = null;
         state.rightIndex = null;
         state.overlapStart = null;
@@ -132,15 +166,38 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
   recompute();
 }
 
+/** A blocking mutation the intended guide's own RTT is too short to
+ * actually reach never makes it into the synthesized construct -- mark
+ * it blocked (rather than silently dropping it) so that's visible. */
+function clampMutationsToRtt(mutations, rttStart, rttEnd) {
+  return mutations.map((m) =>
+    m.newBase && (m.position < rttStart || m.position >= rttEnd)
+      ? { ...m, newBase: null, reason: "Outside this guide's own RTT -- lengthen the RTT overlap to reach it." }
+      : m
+  );
+}
+
 /** Resolve the pair + assembled design for whatever is currently picked,
  * exactly the same computation renderMain uses for display -- shared so
- * "Save as set" saves precisely what's on screen. */
-function resolveCurrentDesign(record, leftGuides, rightGuides, state) {
-  if (state.leftIndex === null || state.rightIndex === null) return { pair: null, design: null, error: null };
+ * "Save as set" saves precisely what's on screen.
+ *
+ * When state.blockingRegion isn't "none", the design is computed twice:
+ * once (wild-type) purely to learn each guide's own RTT window, then
+ * again against a reference copy with the chosen blocking mutation(s)
+ * baked in at the genomic positions that fall inside that window --
+ * coordinates are untouched throughout (single-base substitutions
+ * only), so this never risks the geometry math itself.
+ */
+function resolveCurrentDesign(record, leftGuides, rightGuides, state, cdsRange) {
+  if (state.leftIndex === null || state.rightIndex === null) {
+    return { pair: null, design: null, mutations: null, error: null };
+  }
 
   const left = leftGuides[state.leftIndex];
   const right = rightGuides[state.rightIndex];
-  if (left.nickPosition >= right.nickPosition) return { pair: null, design: null, error: null };
+  if (left.nickPosition >= right.nickPosition) {
+    return { pair: null, design: null, mutations: null, error: null };
+  }
 
   const pair = makePair(left, right);
   const nickDistance = pair.nickDistance;
@@ -150,18 +207,32 @@ function resolveCurrentDesign(record, leftGuides, rightGuides, state) {
     const centeredStart = pair.leftGuide.nickPosition + Math.floor((nickDistance - state.overlapLength) / 2);
     overlapStart = state.overlapStart ?? centeredStart;
   }
+  const resolvedOverlapStart = state.centerOverlap ? null : overlapStart;
 
   try {
-    const design = designPairedPegrnas(
-      record.sequence,
-      pair,
-      state.pbs,
-      state.overlapLength,
-      state.centerOverlap ? null : overlapStart
+    const baseDesign = designPairedPegrnas(record.sequence, pair, state.pbs, state.overlapLength, resolvedOverlapStart);
+
+    if (state.blockingRegion === "none") {
+      return { pair, design: baseDesign, mutations: null, error: null };
+    }
+
+    const leftMutations = clampMutationsToRtt(
+      designBlockingMutations({ referenceSequence: record.sequence, guide: pair.leftGuide, region: state.blockingRegion, cds: cdsRange }),
+      baseDesign.plan.leftRttStart,
+      baseDesign.plan.leftRttEnd
     );
-    return { pair, design, error: null };
+    const rightMutations = clampMutationsToRtt(
+      designBlockingMutations({ referenceSequence: record.sequence, guide: pair.rightGuide, region: state.blockingRegion, cds: cdsRange }),
+      baseDesign.plan.rightRttStart,
+      baseDesign.plan.rightRttEnd
+    );
+
+    const mutatedReference = applyBlockingMutations(record.sequence, [...leftMutations, ...rightMutations]);
+    const design = designPairedPegrnas(mutatedReference, pair, state.pbs, state.overlapLength, resolvedOverlapStart);
+
+    return { pair, design, mutations: { left: leftMutations, right: rightMutations }, error: null };
   } catch (e) {
-    return { pair, design: null, error: e };
+    return { pair, design: null, mutations: null, error: e };
   }
 }
 
@@ -183,13 +254,40 @@ function buildMapBlock(record, leftGuides, rightGuides, state, overlapRange, exo
   `;
 }
 
+/** One mutation as short, readable text: "pos 21 G→A (silent, Gly)",
+ * "pos 22 blocked -- no synonymous codon for Gly (GGC)", etc. */
+function mutationText(m) {
+  if (!m.newBase) {
+    return `<span style="color:var(--danger);">pos ${m.position} blocked${m.reason ? ` — ${escapeHtml(m.reason)}` : ""}</span>`;
+  }
+  const tag = m.synonymous === true ? ` (silent, ${m.aminoAcid})` : m.synonymous === null ? "" : "";
+  return `<span class="mono">${m.position} ${m.originalBase}→${m.newBase}</span>${tag}`;
+}
+
+/** Summary line(s) for whatever blocking mutations were attempted on
+ * this pair -- omitted entirely when blocking mutation wasn't used. */
+function mutationSummaryHtml(mutations) {
+  if (!mutations) return "";
+
+  const sideLine = (label, list) => {
+    if (!list.length) return "";
+    return `<div class="caption"><strong style="color:var(--text);">${label} blocking:</strong> ${list.map(mutationText).join(" · ")}</div>`;
+  };
+
+  const lines = [sideLine("Left", mutations.left), sideLine("Right", mutations.right)].filter(Boolean);
+  if (!lines.length) return "";
+
+  return `<div style="border-top:1px solid var(--border-soft);padding-top:10px;margin-top:-4px;display:flex;flex-direction:column;gap:4px;">${lines.join("")}</div>`;
+}
+
 /** One pegRNA-pair card, shared between the live (unsaved) preview and
  * each saved set below it. */
-function buildPairCardHtml({ setNumber, pair, design, actions }) {
+function buildPairCardHtml({ setNumber, pair, design, mutations, actions }) {
   return buildPegrnaCardHtml({
     setNumber,
     headerRight: [{ label: "Overlap", value: `${design.plan.overlapLength} nt` }],
     actions,
+    extraFooter: mutationSummaryHtml(mutations),
     sides: [
       {
         title: "Left pegRNA",
@@ -222,23 +320,36 @@ function buildPairCardHtml({ setNumber, pair, design, actions }) {
   });
 }
 
+/** Compact, CSV-friendly text for one side's mutation list, e.g.
+ * "22:G>A(silent);21:blocked" -- empty string when there's nothing to say. */
+function mutationsForCsv(list) {
+  if (!list || !list.length) return "";
+  return list
+    .map((m) => (m.newBase ? `${m.position}:${m.originalBase}>${m.newBase}${m.synonymous ? "(silent)" : ""}` : `${m.position}:blocked`))
+    .join(";");
+}
+
 function buildSavedSetsBlock(record, state, exonRange) {
   if (!state.savedSets.length) return { html: "", download: null };
 
   const cardsHtml = state.savedSets
-    .map(({ pair, design }, i) =>
+    .map(({ pair, design, mutations }, i) =>
       buildPairCardHtml({
         setNumber: i + 1,
         pair,
         design,
+        mutations,
         actions: `<button class="btn btn-ghost btn-sm" data-remove-set-index="${i}">Remove</button>`,
       })
     )
     .join("");
 
-  const rows = state.savedSets.flatMap(({ design }, i) => {
+  const rows = state.savedSets.flatMap(({ design, mutations }, i) => {
     const extra = { set: i + 1, overlap_length_nt: design.plan.overlapLength };
-    return [pegrnaSideRow(extra, "Left", design.left), pegrnaSideRow(extra, "Right", design.right)];
+    return [
+      { ...pegrnaSideRow(extra, "Left", design.left), blocking_mutations: mutationsForCsv(mutations?.left) },
+      { ...pegrnaSideRow(extra, "Right", design.right), blocking_mutations: mutationsForCsv(mutations?.right) },
+    ];
   });
 
   // What's actually been picked so far, at a glance -- same coverage
@@ -292,7 +403,7 @@ function buildSavedSetsBlock(record, state, exonRange) {
   };
 }
 
-function renderMain(record, leftGuides, rightGuides, state, exonRange) {
+function renderMain(record, leftGuides, rightGuides, state, exonRange, cdsRange) {
   const savedBlock = buildSavedSetsBlock(record, state, exonRange);
 
   if (state.leftIndex === null || state.rightIndex === null) {
@@ -331,19 +442,7 @@ function renderMain(record, leftGuides, rightGuides, state, exonRange) {
     }
   }
 
-  let design;
-  let error = null;
-  try {
-    design = designPairedPegrnas(
-      record.sequence,
-      pair,
-      state.pbs,
-      state.overlapLength,
-      state.centerOverlap ? null : overlapStart
-    );
-  } catch (e) {
-    error = e;
-  }
+  const { design, mutations, error } = resolveCurrentDesign(record, leftGuides, rightGuides, state, cdsRange);
 
   if (!design) {
     return {
@@ -372,6 +471,7 @@ function renderMain(record, leftGuides, rightGuides, state, exonRange) {
       setNumber: null,
       pair,
       design,
+      mutations,
       actions: `<button class="btn btn-primary btn-sm" id="save-set-btn">Save as set</button>`,
     })}
   `;
