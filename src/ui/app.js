@@ -47,6 +47,13 @@ const appState = {
   // sequence"). Consumed once per design as long as it's still a single
   // record -- gene fetches never produce more than one.
   geneExonRange: null,
+  // Raw landing-page CDS fields (strings, so an input can sit empty
+  // instead of coercing to 0) -- validated into cdsRange on "Design
+  // pegRNAs". Optional: leaving start/end blank means no CDS assigned.
+  cdsInput: { start: "", end: "", strand: "+" },
+  // {start, end, strand} once validated, or null. Like geneExonRange,
+  // only meaningful while a single record is active.
+  cdsRange: null,
 };
 
 const root = document.getElementById("app");
@@ -88,6 +95,30 @@ function renderLanding() {
 
           <div id="input-body"></div>
 
+          <details class="guide-details" id="cds-details" ${appState.cdsInput.start || appState.cdsInput.end ? "open" : ""}>
+            <summary>Assign coding sequence (CDS) -- optional, enables silent blocking mutations</summary>
+            <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">
+              <div class="caption">If you know where the coding sequence sits in this input, Manual pair can design PAM/seed-disrupting mutations that don't change the protein. Leave both blank to skip this.</div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <div style="flex:1 1 140px;">
+                  <div class="field-label">CDS start (0-based)</div>
+                  <input type="number" id="cds-start-input" class="field" style="width:100%;" min="0" value="${escapeHtml(appState.cdsInput.start)}">
+                </div>
+                <div style="flex:1 1 140px;">
+                  <div class="field-label">CDS end (exclusive)</div>
+                  <input type="number" id="cds-end-input" class="field" style="width:100%;" min="0" value="${escapeHtml(appState.cdsInput.end)}">
+                </div>
+                <div style="flex:1 1 140px;">
+                  <div class="field-label">Reading strand</div>
+                  <select id="cds-strand-select" class="field" style="width:100%;">
+                    <option value="+" ${appState.cdsInput.strand === "+" ? "selected" : ""}>+</option>
+                    <option value="-" ${appState.cdsInput.strand === "-" ? "selected" : ""}>&minus;</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </details>
+
           <div id="parse-error"></div>
 
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -112,10 +143,21 @@ function renderLanding() {
     appState.inputTab = "paste";
     appState.inputText = EXAMPLE_FASTA;
     appState.geneExonRange = null;
+    appState.cdsInput = { start: "", end: "", strand: "+" };
     renderLanding();
   });
 
   root.querySelector("#design-btn").addEventListener("click", handleDesignClick);
+
+  root.querySelector("#cds-start-input").addEventListener("input", (e) => {
+    appState.cdsInput.start = e.target.value;
+  });
+  root.querySelector("#cds-end-input").addEventListener("input", (e) => {
+    appState.cdsInput.end = e.target.value;
+  });
+  root.querySelector("#cds-strand-select").addEventListener("change", (e) => {
+    appState.cdsInput.strand = e.target.value;
+  });
 }
 
 function renderInputBody() {
@@ -139,6 +181,7 @@ function renderInputBody() {
       if (!file) return;
       appState.inputText = await file.text();
       appState.geneExonRange = null;
+      appState.cdsInput = { start: "", end: "", strand: "+" };
       appState.inputTab = "paste";
       renderLanding();
     });
@@ -148,6 +191,7 @@ function renderInputBody() {
       appState.inputTab = "paste";
       appState.inputText = fastaText;
       appState.geneExonRange = exonRange;
+      appState.cdsInput = { start: "", end: "", strand: "+" };
       renderLanding();
     });
   }
@@ -159,6 +203,21 @@ function handleDesignClick() {
 
   try {
     const records = parseSequenceText(appState.inputText);
+
+    const { start, end, strand } = appState.cdsInput;
+    if (start.trim() !== "" || end.trim() !== "") {
+      const s = Number(start);
+      const e = Number(end);
+      const valid = Number.isInteger(s) && Number.isInteger(e) && s >= 0 && e > s && e <= records[0].length;
+      if (!valid) {
+        errorBox.innerHTML = `<div class="warning-box" style="margin-top:-8px;">CDS range must satisfy 0 ≤ start &lt; end ≤ sequence length (${records[0].length} nt). Leave both fields blank to skip CDS assignment.</div>`;
+        return;
+      }
+      appState.cdsRange = { start: s, end: e, strand };
+    } else {
+      appState.cdsRange = null;
+    }
+
     appState.records = records;
     appState.selectedRecordId = records[0].recordId;
     appState.mode = "manual";
@@ -292,6 +351,10 @@ function renderWorkspace() {
   root.querySelector("#new-sequence-btn").addEventListener("click", () => {
     appState.records = null;
     appState.geneExonRange = null;
+    // Re-validated on the next "Design pegRNAs" click -- the raw
+    // cdsInput fields are left as-is since inputText is too (both stay
+    // pre-filled in case this is just "let me tweak and redesign").
+    appState.cdsRange = null;
     renderLanding();
   });
 
@@ -350,12 +413,14 @@ function renderWorkspace() {
   // Only ever set for a sequence fetched whole via "Fetch by gene" --
   // meaningless once more than one record is in play.
   const exonRange = appState.records.length === 1 ? appState.geneExonRange : null;
+  const cdsRange = appState.records.length === 1 ? appState.cdsRange : null;
 
   activeMode.render({
     record,
     guides,
     pairs,
     exonRange,
+    cdsRange,
     state: appState.modeState[appState.mode],
     sidebarExtra,
     mainContent,

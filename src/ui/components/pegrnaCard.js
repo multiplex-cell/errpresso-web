@@ -28,8 +28,10 @@ function fullSequenceBlockHtml({ spacer, rtt, pbs }) {
  * }>} opts.sides -- one entry for a single pegRNA, two for a pair (Left/Right)
  * @param {string} [opts.footnote]
  * @param {string} [opts.actions] -- extra HTML (e.g. a button) appended after headerRight
+ * @param {string} [opts.extraFooter] -- extra HTML block appended after footnote (e.g. a
+ *   blocking-mutation summary), on its own top border same as footnote
  */
-export function buildPegrnaCardHtml({ setNumber, headerRight = [], sides, footnote, actions = "" }) {
+export function buildPegrnaCardHtml({ setNumber, headerRight = [], sides, footnote, actions = "", extraFooter = "" }) {
   const sidesHtml = sides
     .map(
       (side, index) => `
@@ -76,6 +78,7 @@ export function buildPegrnaCardHtml({ setNumber, headerRight = [], sides, footno
       </div>
 
       ${footnote ? `<div class="caption" style="border-top: 1px solid var(--border-soft); padding-top: 12px; margin-top: -2px;">${footnote}</div>` : ""}
+      ${extraFooter}
     </div>
   `;
 }
