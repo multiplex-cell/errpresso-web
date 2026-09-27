@@ -280,7 +280,10 @@ function mutationText(m) {
     return `<span style="color:var(--danger);">pos ${m.position} blocked${m.reason ? ` — ${escapeHtml(m.reason)}` : ""}</span>`;
   }
   const tag = m.synonymous === true ? ` (silent, ${m.aminoAcid})` : m.synonymous === null ? "" : "";
-  return `<span class="mono">${m.position} ${m.originalBase}→${m.newBase}</span>${tag}`;
+  const nagNote = m.stillFormsNag
+    ? ` <span style="color:var(--danger);">— still forms NAG, a weaker but real PAM</span>`
+    : "";
+  return `<span class="mono">${m.position} ${m.originalBase}→${m.newBase}</span>${tag}${nagNote}`;
 }
 
 /** Group consecutive display entries that share the same in-CDS codon into
@@ -321,11 +324,12 @@ function regionTrackHtml(entries) {
       ? `<span style="color:var(--text-faint);">·</span>`
       : blocked
         ? `<span style="color:var(--danger);">✕</span>`
-        : `<span style="color:var(--teal);font-weight:700;">${escapeHtml(e.newBase)}</span>`;
+        : `<span style="color:${e.stillFormsNag ? "var(--danger)" : "var(--teal)"};font-weight:700;">${escapeHtml(e.newBase)}${e.stillFormsNag ? "⚠" : ""}</span>`;
     const background = e.regionLabel === "seed" ? "var(--accent-soft)" : "var(--bg)";
+    const border = e.stillFormsNag ? "1px dashed var(--danger)" : "1px solid transparent";
 
     return `
-      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;padding:3px 2px;border-radius:4px;background:${background};">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;padding:3px 2px;border-radius:4px;background:${background};border:${border};">
         <div style="font-size:8.5px;color:var(--text-faint);">${e.position}</div>
         <div class="mono" style="font-size:12px;font-weight:700;color:${baseColor};">${escapeHtml(e.originalBase)}</div>
         <div class="mono" style="font-size:11px;">${outcome}</div>

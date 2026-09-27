@@ -108,6 +108,21 @@ function pamMiddleAvoidBase(guide) {
   return guide.strand === "+" ? "A" : "T";
 }
 
+/** The PAM's other, far ("last") base -- genomic pamStart+2 for a '+'
+ * guide, pamStart for a '-' guide. Whether *this* one still reads as 'G'
+ * is what decides whether an 'A' at the middle position actually leaves
+ * "NAG" behind, or something Cas9 no longer recognizes at all. */
+function pamLastPosition(guide) {
+  return guide.strand === "+" ? guide.pamStart + 2 : guide.pamStart;
+}
+
+/** The base Cas9 actually sees at a genomic position, in the guide's own
+ * reading direction -- the complement of the genomic base when the guide
+ * is on the '-' strand, since it reads that strand's complement. */
+function guidePerceivedBase(guide, genomicBase) {
+  return guide.strand === "+" ? genomicBase : reverseComplement(genomicBase);
+}
+
 /** `candidates` (bases already filtered to exclude the original), with
  * `avoidBase` moved to the end if it's present at all -- a preference,
  * never an exclusion: when it's the only option left, it's still used. */
@@ -154,6 +169,12 @@ export function findBlockingMutationPositions(guide, region) {
  *   when a substitution was actually made (newBase !== null) and CDS-
  *   constrained
  * @property {string} [reason] -- set only when newBase is null, explaining why
+ * @property {boolean} [stillFormsNag] -- set true only on the PAM's middle-
+ *   position entry when, after every mutation in this call is accounted
+ *   for, the PAM still reads as "NAG" in the guide's own direction (its
+ *   middle base ends up 'A' while its other G is left as 'G', usually
+ *   because a CDS forced both outcomes) -- a real, if much weaker,
+ *   non-canonical SpCas9 PAM, not a fully broken one
  */
 
 /**
@@ -174,7 +195,7 @@ export function designBlockingMutations({ referenceSequence, guide, region, cds 
   const positions = findBlockingMutationPositions(guide, region);
   const middlePosition = pamMiddlePosition(guide);
 
-  return positions.map((position) => {
+  const results = positions.map((position) => {
     const originalBase = referenceSequence[position];
     const synInfo = cds ? findSynonymousSubstitutions(referenceSequence, position, cds) : null;
     // Only the PAM's middle base risks leaving "NAG" behind, and only in
@@ -223,6 +244,23 @@ export function designBlockingMutations({ referenceSequence, guide, region, cds 
     const newBase = orderedBases[0];
     return { position, originalBase, newBase, synonymous: null };
   });
+
+  // Whether both PAM bases were even candidates depends on `region`; the
+  // residual-NAG check only makes sense when both were in play.
+  if (region === "pam" || region === "both") {
+    const finalBaseAt = (position) => {
+      const entry = results.find((m) => m.position === position);
+      return entry ? entry.newBase ?? entry.originalBase : referenceSequence[position];
+    };
+    const middleEntry = results.find((m) => m.position === middlePosition);
+    const perceivedMiddle = guidePerceivedBase(guide, finalBaseAt(middlePosition));
+    const perceivedLast = guidePerceivedBase(guide, finalBaseAt(pamLastPosition(guide)));
+    if (middleEntry && perceivedMiddle === "A" && perceivedLast === "G") {
+      middleEntry.stillFormsNag = true;
+    }
+  }
+
+  return results;
 }
 
 /** Apply a list of BlockingMutations to a reference sequence, returning

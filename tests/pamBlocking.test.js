@@ -153,13 +153,47 @@ test("with a CDS offering multiple synonymous bases at the PAM's middle position
 test("still uses the NAG-forming base at the PAM's middle position when it's the only synonymous option", () => {
   // codon [3,4,5] = "GAG" (Glu) -- only the wobble->A alternative (GAA)
   // is synonymous; GAC/GAT are Asp. No other choice exists here.
+  // codon [6,7,8] = "GTT" (Val) -- its 1st position (the PAM's other G,
+  // pamStart+2) is fixed too, so it's left as 'G'. Both forced outcomes
+  // together mean this "silent" PAM disruption still reads as NAG.
   const guide = { pamStart: 4, pamEnd: 7, nickPosition: 1, strand: "+" };
   const cds = { start: 3, end: 9, strand: "+" };
   const mutations = designBlockingMutations({ referenceSequence: "AAAGAGGTT", guide, region: "pam", cds });
   const middle = mutations.find((m) => m.position === 5);
+  const last = mutations.find((m) => m.position === 6);
 
   assert.equal(middle.aminoAcid, "E");
   assert.equal(middle.newBase, "A"); // forced -- it's the only synonymous option there is
+  assert.equal(last.newBase, null); // also forced -- stays 'G'
+  assert.equal(middle.stillFormsNag, true);
+  assert.equal(last.stillFormsNag, undefined); // the flag only ever lands on the middle entry
+});
+
+test("stillFormsNag is never set when nothing constrains the substitutions", () => {
+  // Without a CDS, the PAM's other G is always freely (and immediately)
+  // substituted away from 'G' -- so the residual-NAG condition can never
+  // actually arise here, no matter what the middle position does.
+  const guide = { pamStart: 4, pamEnd: 7, nickPosition: 1, strand: "+" };
+  const mutations = designBlockingMutations({ referenceSequence: "AAAGGGGTT", guide, region: "pam" });
+  assert.ok(mutations.every((m) => !m.stillFormsNag));
+});
+
+test("stillFormsNag is false when the PAM's other G is also disrupted away", () => {
+  // codon [3,4,5] = "GAG" (Glu) -- middle forced to 'A' again, same as
+  // above. But this time codon [6,7,8] = "CGA" (Arg) -- its 1st position
+  // (the PAM's other G) has its own synonymous alternative (AGA is Arg
+  // too), so the design can move it off 'G' entirely: the result is a
+  // fully broken PAM, not NAG, even though the middle base is still the
+  // same forced 'A'.
+  const guide = { pamStart: 4, pamEnd: 7, nickPosition: 1, strand: "+" };
+  const cds = { start: 3, end: 9, strand: "+" };
+  const mutations = designBlockingMutations({ referenceSequence: "AAAGAGCGA", guide, region: "pam", cds });
+  const middle = mutations.find((m) => m.position === 5);
+  const last = mutations.find((m) => m.position === 6);
+
+  assert.equal(middle.newBase, "A");
+  assert.equal(last.newBase, "A"); // CGA -> AGA, still Arg, no longer 'G'
+  assert.ok(!middle.stillFormsNag);
 });
 
 test("applyBlockingMutations only touches positions with a real newBase", () => {
