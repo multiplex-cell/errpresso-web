@@ -7,6 +7,7 @@ import {
   designBlockingMutations,
   applyBlockingMutations,
   mutationsWithinRtt,
+  describeRegionForDisplay,
 } from "../src/core/pamBlocking.js";
 
 // --- findSynonymousSubstitutions -----------------------------------
@@ -132,6 +133,68 @@ test("applyBlockingMutations only touches positions with a real newBase", () => 
   for (let i = 0; i < REFERENCE.length; i++) {
     if (i === 17) assert.notEqual(mutated[i], REFERENCE[i]);
     else assert.equal(mutated[i], REFERENCE[i]);
+  }
+});
+
+// --- describeRegionForDisplay -----------------------------------------
+
+test("'both' lists the whole seed+PAM region in reading order, including the PAM's own N", () => {
+  const entries = describeRegionForDisplay({ referenceSequence: REFERENCE, guide: GUIDE, region: "both", cds: CDS });
+
+  // Reading order for a '+' guide is ascending genomic: seed then PAM,
+  // contiguous (nick..nick+2, then pamStart..pamStart+2).
+  assert.deepEqual(
+    entries.map((e) => e.position),
+    [17, 18, 19, 20, 21, 22]
+  );
+  assert.deepEqual(
+    entries.map((e) => e.regionLabel),
+    ["seed", "seed", "seed", "pam", "pam", "pam"]
+  );
+  assert.deepEqual(
+    entries.map((e) => e.isCandidate),
+    [true, true, true, false, true, true]
+  );
+
+  // The PAM's own "N" (position 20) is never a candidate, but since a CDS
+  // is assigned here it still carries its real codon context: positions
+  // 18/19/20 together form the "CAT" (His) codon.
+  const n = entries.find((e) => e.position === 20);
+  assert.equal(n.newBase, null);
+  assert.equal(n.codon, "CAT");
+  assert.equal(n.aminoAcid, "H");
+  assert.equal(n.posInCodon, 2);
+});
+
+test("'both' reading order for a '-' guide is descending genomic, still contiguous", () => {
+  const minus = { pamStart: 50, pamEnd: 53, nickPosition: 56, strand: "-" };
+  const entries = describeRegionForDisplay({
+    referenceSequence: "A".repeat(60),
+    guide: minus,
+    region: "both",
+  });
+  // seed = [55,54,53] reading order, pam = [52,51,50] reading order --
+  // one contiguous descending run from 55 down to 50.
+  assert.deepEqual(
+    entries.map((e) => e.position),
+    [55, 54, 53, 52, 51, 50]
+  );
+  assert.deepEqual(
+    entries.map((e) => e.regionLabel),
+    ["seed", "seed", "seed", "pam", "pam", "pam"]
+  );
+});
+
+test("without a CDS, describeRegionForDisplay still lists every position with free substitutions", () => {
+  const entries = describeRegionForDisplay({ referenceSequence: REFERENCE, guide: GUIDE, region: "pam" });
+  assert.equal(entries.length, 3);
+  const n = entries.find((e) => e.position === 20);
+  assert.equal(n.isCandidate, false);
+  assert.equal(n.newBase, null);
+  assert.equal(n.codon, undefined);
+  for (const e of entries.filter((e) => e.isCandidate)) {
+    assert.equal(e.synonymous, null);
+    assert.ok(e.newBase);
   }
 });
 

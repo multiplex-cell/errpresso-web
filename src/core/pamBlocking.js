@@ -198,6 +198,84 @@ export function applyBlockingMutations(referenceSequence, mutations) {
   return chars.join("");
 }
 
+/** All positions of `region`, in the guide's own 5'->3' reading direction
+ * (always contiguous for "both": the seed runs directly into the PAM) --
+ * unlike findBlockingMutationPositions, this includes the PAM's own "N",
+ * which is never a mutation candidate but still part of the region a
+ * viewer would want to see. */
+function regionPositionsInReadingOrder(guide, region) {
+  const seedReading =
+    guide.strand === "+"
+      ? [guide.nickPosition, guide.nickPosition + 1, guide.nickPosition + 2]
+      : [guide.nickPosition - 1, guide.nickPosition - 2, guide.nickPosition - 3];
+  const pamReading =
+    guide.strand === "+"
+      ? [guide.pamStart, guide.pamStart + 1, guide.pamStart + 2]
+      : [guide.pamStart + 2, guide.pamStart + 1, guide.pamStart];
+
+  const withLabel = (positions, regionLabel) => positions.map((position) => ({ position, regionLabel }));
+  if (region === "seed") return withLabel(seedReading, "seed");
+  if (region === "pam") return withLabel(pamReading, "pam");
+  return [...withLabel(seedReading, "seed"), ...withLabel(pamReading, "pam")];
+}
+
+/**
+ * @typedef {Object} RegionDisplayEntry
+ * @property {number} position
+ * @property {"seed"|"pam"} regionLabel
+ * @property {boolean} isCandidate -- false only for the PAM's own "N",
+ *   which is never a mutation candidate but still shown for context
+ * @property {string} originalBase
+ * @property {string|null} newBase
+ * @property {boolean|null} synonymous
+ * @property {string} [codon] -- CDS reading direction, if a CDS applies here
+ * @property {string} [aminoAcid]
+ * @property {number} [posInCodon]
+ * @property {string} [mutatedCodon]
+ * @property {string} [reason]
+ */
+
+/**
+ * The whole `region`, position by position, in the guide's own reading
+ * direction -- for rendering a contiguous seed/PAM track rather than only
+ * the sparse set of positions blocking-mutation design actually acts on.
+ * Candidate positions carry exactly what designBlockingMutations computed
+ * for them; the PAM's own "N" (never a candidate) still carries its
+ * reference base and, if a CDS applies there, codon/amino-acid context --
+ * purely for display continuity, never a proposed substitution.
+ *
+ * @param {Object} opts
+ * @param {string} opts.referenceSequence
+ * @param {import("./guides.js").GuideCandidate} opts.guide
+ * @param {"pam"|"seed"|"both"} opts.region
+ * @param {CdsRange|null} [opts.cds]
+ * @returns {RegionDisplayEntry[]}
+ */
+export function describeRegionForDisplay({ referenceSequence, guide, region, cds }) {
+  const candidatePositions = new Set(findBlockingMutationPositions(guide, region));
+  const mutationsByPosition = new Map(
+    designBlockingMutations({ referenceSequence, guide, region, cds }).map((m) => [m.position, m])
+  );
+
+  return regionPositionsInReadingOrder(guide, region).map(({ position, regionLabel }) => {
+    if (candidatePositions.has(position)) {
+      return { ...mutationsByPosition.get(position), regionLabel, isCandidate: true };
+    }
+
+    const originalBase = referenceSequence[position];
+    const synInfo = cds ? findSynonymousSubstitutions(referenceSequence, position, cds) : null;
+    return {
+      position,
+      regionLabel,
+      isCandidate: false,
+      originalBase,
+      newBase: null,
+      synonymous: null,
+      ...(synInfo ? { codon: synInfo.codon, aminoAcid: synInfo.aminoAcid, posInCodon: synInfo.posInCodon } : {}),
+    };
+  });
+}
+
 /** Whether every position in `mutations` falls within [rttStart, rttEnd)
  * -- i.e. whether this guide's own RTT is actually long enough to reach
  * (and so actually write) the positions being mutated. A mutation the

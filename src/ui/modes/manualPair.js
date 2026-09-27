@@ -7,7 +7,7 @@
 import { makePair } from "../../core/pairs.js";
 import { designPairedPegrnas } from "../../core/pegrnaDesign.js";
 import { intervalsLength } from "../../core/intervals.js";
-import { designBlockingMutations, applyBlockingMutations } from "../../core/pamBlocking.js";
+import { designBlockingMutations, applyBlockingMutations, describeRegionForDisplay } from "../../core/pamBlocking.js";
 import { stepperFieldHtml, attachStepperField, toggleHtml, attachToggle } from "../controls.js";
 import { buildSpacerMapHtml } from "../components/spacerMap.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
@@ -145,9 +145,9 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
     const saveBtn = mainContent.querySelector("#save-set-btn");
     if (saveBtn) {
       saveBtn.addEventListener("click", () => {
-        const { pair, design, mutations } = resolveCurrentDesign(record, leftGuides, rightGuides, state, cdsRange);
+        const { pair, design, mutations, regionDisplay } = resolveCurrentDesign(record, leftGuides, rightGuides, state, cdsRange);
         if (!design) return;
-        state.savedSets.push({ pair, design, mutations });
+        state.savedSets.push({ pair, design, mutations, regionDisplay });
         state.leftIndex = null;
         state.rightIndex = null;
         state.overlapStart = null;
@@ -190,13 +190,13 @@ function clampMutationsToRtt(mutations, rttStart, rttEnd) {
  */
 function resolveCurrentDesign(record, leftGuides, rightGuides, state, cdsRange) {
   if (state.leftIndex === null || state.rightIndex === null) {
-    return { pair: null, design: null, mutations: null, error: null };
+    return { pair: null, design: null, mutations: null, regionDisplay: null, error: null };
   }
 
   const left = leftGuides[state.leftIndex];
   const right = rightGuides[state.rightIndex];
   if (left.nickPosition >= right.nickPosition) {
-    return { pair: null, design: null, mutations: null, error: null };
+    return { pair: null, design: null, mutations: null, regionDisplay: null, error: null };
   }
 
   const pair = makePair(left, right);
@@ -213,7 +213,7 @@ function resolveCurrentDesign(record, leftGuides, rightGuides, state, cdsRange) 
     const baseDesign = designPairedPegrnas(record.sequence, pair, state.pbs, state.overlapLength, resolvedOverlapStart);
 
     if (state.blockingRegion === "none") {
-      return { pair, design: baseDesign, mutations: null, error: null };
+      return { pair, design: baseDesign, mutations: null, regionDisplay: null, error: null };
     }
 
     const leftMutations = clampMutationsToRtt(
@@ -230,9 +230,28 @@ function resolveCurrentDesign(record, leftGuides, rightGuides, state, cdsRange) 
     const mutatedReference = applyBlockingMutations(record.sequence, [...leftMutations, ...rightMutations]);
     const design = designPairedPegrnas(mutatedReference, pair, state.pbs, state.overlapLength, resolvedOverlapStart);
 
-    return { pair, design, mutations: { left: leftMutations, right: rightMutations }, error: null };
+    // The full seed/PAM region, position by position -- for the visual
+    // track, not just the sparse candidate positions in leftMutations/
+    // rightMutations above (which stay exactly as before, for the text
+    // summary and the saved CSV).
+    const regionDisplay = {
+      left: describeRegionForDisplay({
+        referenceSequence: record.sequence,
+        guide: pair.leftGuide,
+        region: state.blockingRegion,
+        cds: cdsRange,
+      }),
+      right: describeRegionForDisplay({
+        referenceSequence: record.sequence,
+        guide: pair.rightGuide,
+        region: state.blockingRegion,
+        cds: cdsRange,
+      }),
+    };
+
+    return { pair, design, mutations: { left: leftMutations, right: rightMutations }, regionDisplay, error: null };
   } catch (e) {
-    return { pair, design: null, mutations: null, error: e };
+    return { pair, design: null, mutations: null, regionDisplay: null, error: e };
   }
 }
 
@@ -264,73 +283,99 @@ function mutationText(m) {
   return `<span class="mono">${m.position} ${m.originalBase}→${m.newBase}</span>${tag}`;
 }
 
-/** One codon (3 chars) as HTML, with the base at `markIndex` bolded and
- * colored -- the same rendering for a reference or a mutated codon, just
- * with a different index/color, so ref and mutated line up visually. */
-function codonHtml(codon, markIndex, markColor) {
-  return [...codon]
-    .map((ch, i) => (i === markIndex ? `<span style="color:${markColor};font-weight:700;">${escapeHtml(ch)}</span>` : escapeHtml(ch)))
-    .join("");
+/** Group consecutive display entries that share the same in-CDS codon into
+ * one run (capped at 3 -- a codon is never more than 3 bases, so a 4th
+ * entry with a matching string is always a *different* codon that just
+ * happens to read the same) so the amino acid can be labeled once per
+ * codon instead of once per base. Entries with no CDS context here each
+ * get their own (unlabeled) group of 1, to keep column bookkeeping simple. */
+function groupByCodon(entries) {
+  const groups = [];
+  for (const entry of entries) {
+    const last = groups[groups.length - 1];
+    if (last && entry.codon !== undefined && entry.codon === last.codon && last.entries.length < 3) {
+      last.entries.push(entry);
+    } else {
+      groups.push({ codon: entry.codon, entries: [entry] });
+    }
+  }
+  return groups;
 }
 
-/** Small ref/mutated visual for one blocking-mutation position -- a
- * codon-and-amino-acid diagram when it's CDS-constrained (so "silent"
- * is visible, not just claimed), or a bare base swap otherwise. Omitted
- * for a position with no substitution at all outside a CDS (nothing to
- * show; the free case only ever appears with a base swap in practice). */
-function mutationVisualCardHtml(m) {
-  const posLabel = `<div style="font-size:9.5px;color:var(--text-faint);">${m.position}</div>`;
-  const cardStyle =
-    "display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;border:1px solid var(--border-soft);border-radius:6px;padding:5px 8px;background:var(--bg);min-width:52px;";
+/** A contiguous, position-by-position (1 nt per column) track for one
+ * side's whole seed/PAM region -- not just the positions a mutation was
+ * attempted at, so the untouched PAM "N" still appears in context. Each
+ * column shows the position, its reference base, and what happened to it
+ * (the substituted base in teal, a red "x" if blocked, or a faint dot for
+ * the "N", which is never a candidate); a second row underneath labels
+ * each in-CDS codon's amino acid once, spanning exactly the columns that
+ * belong to it. */
+function regionTrackHtml(entries) {
+  if (!entries.length) return "";
 
-  if (m.codon === undefined) {
-    if (!m.newBase) return "";
+  const columnHtml = (e) => {
+    const isN = !e.isCandidate;
+    const blocked = e.isCandidate && !e.newBase;
+    const baseColor = isN ? "var(--text-faint)" : blocked ? "var(--danger)" : "var(--teal)";
+    const outcome = isN
+      ? `<span style="color:var(--text-faint);">·</span>`
+      : blocked
+        ? `<span style="color:var(--danger);">✕</span>`
+        : `<span style="color:var(--teal);font-weight:700;">${escapeHtml(e.newBase)}</span>`;
+    const background = e.regionLabel === "seed" ? "var(--accent-soft)" : "var(--bg)";
+
     return `
-      <div style="${cardStyle}">
-        ${posLabel}
-        <div class="mono">${escapeHtml(m.originalBase)}→<span style="color:var(--teal);font-weight:700;">${escapeHtml(m.newBase)}</span></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;padding:3px 2px;border-radius:4px;background:${background};">
+        <div style="font-size:8.5px;color:var(--text-faint);">${e.position}</div>
+        <div class="mono" style="font-size:12px;font-weight:700;color:${baseColor};">${escapeHtml(e.originalBase)}</div>
+        <div class="mono" style="font-size:11px;">${outcome}</div>
       </div>
     `;
-  }
+  };
 
-  const blocked = !m.newBase;
-  const markColor = blocked ? "var(--danger)" : "var(--teal)";
+  const groupLabelHtml = (group) => {
+    const label = group.codon !== undefined ? escapeHtml(group.entries[0].aminoAcid) : "";
+    return `<div style="grid-column: span ${group.entries.length};text-align:center;font-size:9.5px;color:var(--text-faint);border-top:1px solid var(--border-soft);padding-top:3px;">${label}</div>`;
+  };
+
   return `
-    <div style="${cardStyle}">
-      ${posLabel}
-      <div class="mono">${codonHtml(m.codon, m.posInCodon, markColor)}</div>
-      <div class="mono" style="color:var(--text-faint);">${blocked ? "—" : codonHtml(m.mutatedCodon, m.posInCodon, markColor)}</div>
-      <div style="font-size:10.5px;color:var(--text-faint);white-space:nowrap;">${blocked ? `${escapeHtml(m.aminoAcid)} · blocked` : `${escapeHtml(m.aminoAcid)} → ${escapeHtml(m.aminoAcid)}`}</div>
+    <div style="display:grid;grid-template-columns:repeat(${entries.length}, minmax(28px, 1fr));gap:2px 4px;max-width:fit-content;">
+      ${entries.map(columnHtml).join("")}
+      ${groupByCodon(entries).map(groupLabelHtml).join("")}
     </div>
   `;
 }
 
-/** Summary line(s) for whatever blocking mutations were attempted on
- * this pair -- omitted entirely when blocking mutation wasn't used. */
-function mutationSummaryHtml(mutations) {
+/** Summary for whatever blocking mutations were attempted on this pair --
+ * a text line of what changed (or why not) plus a per-nucleotide seed/PAM
+ * track underneath, per side. Omitted entirely when blocking mutation
+ * wasn't used. */
+function mutationSummaryHtml(mutations, regionDisplay) {
   if (!mutations) return "";
 
-  const sideBlock = (label, list) => {
+  const sideBlock = (label, list, entries) => {
     if (!list.length) return "";
     const textLine = `<div class="caption"><strong style="color:var(--text);">${label} blocking:</strong> ${list.map(mutationText).join(" · ")}</div>`;
-    const cards = list.map(mutationVisualCardHtml).join("");
-    return `${textLine}<div style="display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 2px;">${cards}</div>`;
+    return `${textLine}${regionTrackHtml(entries || [])}`;
   };
 
-  const blocks = [sideBlock("Left", mutations.left), sideBlock("Right", mutations.right)].filter(Boolean);
+  const blocks = [
+    sideBlock("Left", mutations.left, regionDisplay?.left),
+    sideBlock("Right", mutations.right, regionDisplay?.right),
+  ].filter(Boolean);
   if (!blocks.length) return "";
 
-  return `<div style="border-top:1px solid var(--border-soft);padding-top:10px;margin-top:-4px;display:flex;flex-direction:column;gap:6px;">${blocks.join("")}</div>`;
+  return `<div style="border-top:1px solid var(--border-soft);padding-top:10px;margin-top:-4px;display:flex;flex-direction:column;gap:8px;">${blocks.join("")}</div>`;
 }
 
 /** One pegRNA-pair card, shared between the live (unsaved) preview and
  * each saved set below it. */
-function buildPairCardHtml({ setNumber, pair, design, mutations, actions }) {
+function buildPairCardHtml({ setNumber, pair, design, mutations, regionDisplay, actions }) {
   return buildPegrnaCardHtml({
     setNumber,
     headerRight: [{ label: "Overlap", value: `${design.plan.overlapLength} nt` }],
     actions,
-    extraFooter: mutationSummaryHtml(mutations),
+    extraFooter: mutationSummaryHtml(mutations, regionDisplay),
     sides: [
       {
         title: "Left pegRNA",
@@ -376,12 +421,13 @@ function buildSavedSetsBlock(record, state, exonRange) {
   if (!state.savedSets.length) return { html: "", download: null };
 
   const cardsHtml = state.savedSets
-    .map(({ pair, design, mutations }, i) =>
+    .map(({ pair, design, mutations, regionDisplay }, i) =>
       buildPairCardHtml({
         setNumber: i + 1,
         pair,
         design,
         mutations,
+        regionDisplay,
         actions: `<button class="btn btn-ghost btn-sm" data-remove-set-index="${i}">Remove</button>`,
       })
     )
@@ -485,7 +531,7 @@ function renderMain(record, leftGuides, rightGuides, state, exonRange, cdsRange)
     }
   }
 
-  const { design, mutations, error } = resolveCurrentDesign(record, leftGuides, rightGuides, state, cdsRange);
+  const { design, mutations, regionDisplay, error } = resolveCurrentDesign(record, leftGuides, rightGuides, state, cdsRange);
 
   if (!design) {
     return {
@@ -515,6 +561,7 @@ function renderMain(record, leftGuides, rightGuides, state, exonRange, cdsRange)
       pair,
       design,
       mutations,
+      regionDisplay,
       actions: `<button class="btn btn-primary btn-sm" id="save-set-btn">Save as set</button>`,
     })}
   `;
