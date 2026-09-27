@@ -54,6 +54,9 @@ const appState = {
   // {start, end, strand} once validated, or null. Like geneExonRange,
   // only meaningful while a single record is active.
   cdsRange: null,
+  // Explains an auto-filled (or deliberately not auto-filled) cdsInput
+  // right after a gene fetch -- null the rest of the time.
+  cdsAutoNote: null,
 };
 
 const root = document.getElementById("app");
@@ -95,10 +98,11 @@ function renderLanding() {
 
           <div id="input-body"></div>
 
-          <details class="guide-details" id="cds-details" ${appState.cdsInput.start || appState.cdsInput.end ? "open" : ""}>
+          <details class="guide-details" id="cds-details" ${appState.cdsInput.start || appState.cdsInput.end || appState.cdsAutoNote ? "open" : ""}>
             <summary>Assign coding sequence (CDS) -- optional, enables silent blocking mutations</summary>
             <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">
               <div class="caption">If you know where the coding sequence sits in this input, Manual pair can design PAM/seed-disrupting mutations that don't change the protein. Leave both blank to skip this.</div>
+              ${appState.cdsAutoNote ? `<div class="caption" style="color:var(--accent);">${escapeHtml(appState.cdsAutoNote)}</div>` : ""}
               <div style="display:flex;gap:10px;flex-wrap:wrap;">
                 <div style="flex:1 1 140px;">
                   <div class="field-label">CDS start (0-based)</div>
@@ -144,6 +148,7 @@ function renderLanding() {
     appState.inputText = EXAMPLE_FASTA;
     appState.geneExonRange = null;
     appState.cdsInput = { start: "", end: "", strand: "+" };
+    appState.cdsAutoNote = null;
     renderLanding();
   });
 
@@ -182,16 +187,23 @@ function renderInputBody() {
       appState.inputText = await file.text();
       appState.geneExonRange = null;
       appState.cdsInput = { start: "", end: "", strand: "+" };
+      appState.cdsAutoNote = null;
       appState.inputTab = "paste";
       renderLanding();
     });
   } else {
-    renderGeneFetchPanel(body, appState.geneState, renderLanding, (fastaText, exonRange) => {
+    renderGeneFetchPanel(body, appState.geneState, renderLanding, (fastaText, exonRange, cdsRange, cdsNote) => {
       appState.geneState = defaultGeneState();
       appState.inputTab = "paste";
       appState.inputText = fastaText;
       appState.geneExonRange = exonRange;
-      appState.cdsInput = { start: "", end: "", strand: "+" };
+      if (cdsRange) {
+        appState.cdsInput = { start: String(cdsRange.start), end: String(cdsRange.end), strand: "+" };
+        appState.cdsAutoNote = "Auto-filled from this transcript's annotated CDS -- adjust or clear if it's not what you want.";
+      } else {
+        appState.cdsInput = { start: "", end: "", strand: "+" };
+        appState.cdsAutoNote = cdsNote;
+      }
       renderLanding();
     });
   }

@@ -208,6 +208,12 @@ async function buildAndCacheStructure(symbol, assembly, cacheKey, chrom, regionS
     transcriptId: transcript.name,
     transcriptSource: source,
     exons,
+    // genePred/BED12 "thick" bounds -- the transcript's annotated CDS,
+    // absolute ascending genomic coordinates (same space as exon.start/
+    // end). cdsStart === cdsEnd (UCSC's convention) means no CDS at all,
+    // e.g. a non-coding transcript.
+    cdsStart: Number(transcript.thickStart),
+    cdsEnd: Number(transcript.thickEnd),
   };
 
   structureCache.set(cacheKey, structure);
@@ -265,11 +271,74 @@ export async function fetchSequence(assembly, chrom, start, end) {
 }
 
 /**
+ * Work out where (if anywhere) the fetched exon's own coding portion lands
+ * in the *fetched, gene-oriented* sequence -- i.e. a CDS range fit for
+ * src/core/pamBlocking.js, always `strand: "+"` because the sequence this
+ * indexes into has already been reverse-complemented (see the strand
+ * handling below) when the gene is on the '-' strand.
+ *
+ * A single fetched exon rarely holds the gene's whole CDS: if this isn't
+ * the exon containing the start codon, the reading frame entering it
+ * depends on how many coding bases came before it in earlier exons (not
+ * fetched here). That count is recovered from `exons` (already in
+ * transcript, i.e. 5'->3', order) and used to trim this exon's coding span
+ * down to whichever leading/trailing bases form *complete* codons on
+ * their own -- a codon split across this exon and one we didn't fetch
+ * can't be checked for synonymy, so those few bases are left unassigned
+ * rather than guessed at.
+ *
+ * @returns {{start: number, end: number}|null} local offsets into the
+ *   fetched sequence, or null if this exon has no usable coding portion
+ *   (no CDS on this transcript, exon is pure UTR, or too little of it
+ *   survives frame-trimming to form even one full codon).
+ */
+export function computeLocalCdsRange({ exons, exonIndex, cdsStart, cdsEnd, strand, windowStart, windowEnd }) {
+  if (!(cdsStart < cdsEnd)) return null;
+
+  const exon = exons[exonIndex];
+  const codingStartAbs = Math.max(exon.start, cdsStart);
+  const codingEndAbs = Math.min(exon.end, cdsEnd);
+  if (codingStartAbs >= codingEndAbs) return null;
+
+  // Coding length contributed by every earlier exon in transcript order --
+  // an interval length, so direction (strand) doesn't matter here.
+  let precedingCodingLength = 0;
+  for (let i = 0; i < exonIndex; i++) {
+    const len = Math.min(exons[i].end, cdsEnd) - Math.max(exons[i].start, cdsStart);
+    if (len > 0) precedingCodingLength += len;
+  }
+  const phaseIn = precedingCodingLength % 3;
+
+  const codingLen = codingEndAbs - codingStartAbs;
+  const leadTrim = (3 - phaseIn) % 3;
+  const usableLen = Math.max(0, Math.floor((codingLen - leadTrim) / 3) * 3);
+  if (usableLen <= 0) return null;
+
+  // The transcript-5' edge of this exon's coding span is the low-coordinate
+  // end for a '+' gene, the high-coordinate end for a '-' gene.
+  let usableStartAbs;
+  let usableEndAbs;
+  if (strand === "+") {
+    usableStartAbs = codingStartAbs + leadTrim;
+    usableEndAbs = usableStartAbs + usableLen;
+  } else {
+    usableEndAbs = codingEndAbs - leadTrim;
+    usableStartAbs = usableEndAbs - usableLen;
+  }
+
+  // Same transform as exonOffsetStart/exonOffsetEnd below.
+  if (strand === "-") {
+    return { start: windowEnd - usableEndAbs, end: windowEnd - usableStartAbs };
+  }
+  return { start: usableStartAbs - windowStart, end: usableEndAbs - windowStart };
+}
+
+/**
  * Fetch one exon plus flanking sequence, oriented 5' to 3' on the gene.
  * `upstream`/`downstream` are transcript-relative nucleotide counts (5'
  * and 3' of the exon respectively), regardless of the gene's strand.
  *
- * @returns {Promise<{sequence: string, description: string, geneSymbol: string, exonNumber: number, exonCount: number}>}
+ * @returns {Promise<{sequence: string, description: string, geneSymbol: string, exonNumber: number, exonCount: number, cdsRange: {start: number, end: number}|null, cdsNote: string|null}>}
  */
 export async function fetchExonWithFlanks({ geneSymbol, exonNumber, upstream, downstream, assembly = ASSEMBLY }) {
   if (upstream < 0 || downstream < 0) {
@@ -314,6 +383,23 @@ export async function fetchExonWithFlanks({ geneSymbol, exonNumber, upstream, do
     `(${structure.transcriptSource}, ${structure.transcriptId}) ${assembly} ` +
     `${structure.chrom}:${windowStart}-${windowEnd} (${structure.strand} strand, shown 5' to 3' on the gene)`;
 
+  let cdsRange = null;
+  let cdsNote = null;
+  if (structure.cdsStart < structure.cdsEnd) {
+    cdsRange = computeLocalCdsRange({
+      exons: structure.exons,
+      exonIndex: exonNumber - 1,
+      cdsStart: structure.cdsStart,
+      cdsEnd: structure.cdsEnd,
+      strand: structure.strand,
+      windowStart,
+      windowEnd,
+    });
+    if (!cdsRange) {
+      cdsNote = `Exon ${exonNumber} of ${structure.transcriptId} has no CDS bases usable for silent mutations (untranslated, or too short after reading-frame alignment).`;
+    }
+  }
+
   return {
     sequence,
     description,
@@ -321,6 +407,8 @@ export async function fetchExonWithFlanks({ geneSymbol, exonNumber, upstream, do
     strand: structure.strand,
     transcriptId: structure.transcriptId,
     transcriptSource: structure.transcriptSource,
+    cdsRange,
+    cdsNote,
     exonNumber,
     exonCount: structure.exons.length,
     chrom: structure.chrom,

@@ -42,9 +42,14 @@ export function defaultGeneState() {
  * `state` is a mutable object (defaultGeneState()) the caller persists
  * across re-renders. `rerender` re-renders the panel (and whatever else
  * the caller's landing page needs) after a state change.
- * `onFetched(fastaText, exonRange)` is called once a sequence has been
- * fetched successfully -- `exonRange` is `{start, end}`, the exon's own
- * (0-based, half-open) coordinates within `fastaText`'s sequence.
+ * `onFetched(fastaText, exonRange, cdsRange, cdsNote)` is called once a
+ * sequence has been fetched successfully -- `exonRange` is `{start, end}`,
+ * the exon's own (0-based, half-open) coordinates within `fastaText`'s
+ * sequence; `cdsRange` is the same shape (or null) for the portion of the
+ * transcript's annotated CDS that lands, frame-safe, inside this exon;
+ * `cdsNote` explains why `cdsRange` is null when the transcript does have
+ * an annotated CDS overall (still null/no note for a non-coding transcript,
+ * since there's nothing noteworthy to say there).
  */
 export function renderGeneFetchPanel(container, state, rerender, onFetched) {
   const structure = state.structure;
@@ -198,7 +203,7 @@ export function renderGeneFetchPanel(container, state, rerender, onFetched) {
         downstream: state.downstream,
       });
       const fasta = `>${result.geneSymbol}_exon${result.exonNumber} ${result.description}\n${result.sequence}\n`;
-      onFetched(fasta, { start: result.exonOffsetStart, end: result.exonOffsetEnd });
+      onFetched(fasta, { start: result.exonOffsetStart, end: result.exonOffsetEnd }, result.cdsRange, result.cdsNote);
     } catch (error) {
       if (error instanceof GeneFetchError) {
         state.fetchError = error.message;
