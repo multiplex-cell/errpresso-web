@@ -104,6 +104,9 @@ test("with a CDS, the seed's degenerate position gets a silent mutation and the 
   assert.equal(byPos[17].synonymous, true);
   assert.ok(byPos[17].newBase);
   assert.notEqual(byPos[17].newBase, "A"); // must actually differ from the original
+  assert.equal(byPos[17].codon, "GGA");
+  assert.equal(byPos[17].posInCodon, 2);
+  assert.equal(byPos[17].mutatedCodon, "GG" + byPos[17].newBase);
 
   // Seed positions 18/19 (1st/2nd of His CAT) -- no silent option.
   assert.equal(byPos[18].newBase, null);
@@ -115,6 +118,9 @@ test("with a CDS, the seed's degenerate position gets a silent mutation and the 
   // i.e. this PAM genuinely can't be silently destroyed here.
   assert.equal(byPos[21].newBase, null);
   assert.equal(byPos[22].newBase, null);
+  assert.equal(byPos[21].codon, "GGC");
+  assert.equal(byPos[21].posInCodon, 0);
+  assert.equal(byPos[21].mutatedCodon, undefined); // nothing to show -- no substitution was made
 });
 
 test("applyBlockingMutations only touches positions with a real newBase", () => {

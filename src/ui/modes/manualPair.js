@@ -264,20 +264,63 @@ function mutationText(m) {
   return `<span class="mono">${m.position} ${m.originalBase}→${m.newBase}</span>${tag}`;
 }
 
+/** One codon (3 chars) as HTML, with the base at `markIndex` bolded and
+ * colored -- the same rendering for a reference or a mutated codon, just
+ * with a different index/color, so ref and mutated line up visually. */
+function codonHtml(codon, markIndex, markColor) {
+  return [...codon]
+    .map((ch, i) => (i === markIndex ? `<span style="color:${markColor};font-weight:700;">${escapeHtml(ch)}</span>` : escapeHtml(ch)))
+    .join("");
+}
+
+/** Small ref/mutated visual for one blocking-mutation position -- a
+ * codon-and-amino-acid diagram when it's CDS-constrained (so "silent"
+ * is visible, not just claimed), or a bare base swap otherwise. Omitted
+ * for a position with no substitution at all outside a CDS (nothing to
+ * show; the free case only ever appears with a base swap in practice). */
+function mutationVisualCardHtml(m) {
+  const posLabel = `<div style="font-size:9.5px;color:var(--text-faint);">${m.position}</div>`;
+  const cardStyle =
+    "display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;border:1px solid var(--border-soft);border-radius:6px;padding:5px 8px;background:var(--bg);min-width:52px;";
+
+  if (m.codon === undefined) {
+    if (!m.newBase) return "";
+    return `
+      <div style="${cardStyle}">
+        ${posLabel}
+        <div class="mono">${escapeHtml(m.originalBase)}→<span style="color:var(--teal);font-weight:700;">${escapeHtml(m.newBase)}</span></div>
+      </div>
+    `;
+  }
+
+  const blocked = !m.newBase;
+  const markColor = blocked ? "var(--danger)" : "var(--teal)";
+  return `
+    <div style="${cardStyle}">
+      ${posLabel}
+      <div class="mono">${codonHtml(m.codon, m.posInCodon, markColor)}</div>
+      <div class="mono" style="color:var(--text-faint);">${blocked ? "—" : codonHtml(m.mutatedCodon, m.posInCodon, markColor)}</div>
+      <div style="font-size:10.5px;color:var(--text-faint);white-space:nowrap;">${blocked ? `${escapeHtml(m.aminoAcid)} · blocked` : `${escapeHtml(m.aminoAcid)} → ${escapeHtml(m.aminoAcid)}`}</div>
+    </div>
+  `;
+}
+
 /** Summary line(s) for whatever blocking mutations were attempted on
  * this pair -- omitted entirely when blocking mutation wasn't used. */
 function mutationSummaryHtml(mutations) {
   if (!mutations) return "";
 
-  const sideLine = (label, list) => {
+  const sideBlock = (label, list) => {
     if (!list.length) return "";
-    return `<div class="caption"><strong style="color:var(--text);">${label} blocking:</strong> ${list.map(mutationText).join(" · ")}</div>`;
+    const textLine = `<div class="caption"><strong style="color:var(--text);">${label} blocking:</strong> ${list.map(mutationText).join(" · ")}</div>`;
+    const cards = list.map(mutationVisualCardHtml).join("");
+    return `${textLine}<div style="display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 2px;">${cards}</div>`;
   };
 
-  const lines = [sideLine("Left", mutations.left), sideLine("Right", mutations.right)].filter(Boolean);
-  if (!lines.length) return "";
+  const blocks = [sideBlock("Left", mutations.left), sideBlock("Right", mutations.right)].filter(Boolean);
+  if (!blocks.length) return "";
 
-  return `<div style="border-top:1px solid var(--border-soft);padding-top:10px;margin-top:-4px;display:flex;flex-direction:column;gap:4px;">${lines.join("")}</div>`;
+  return `<div style="border-top:1px solid var(--border-soft);padding-top:10px;margin-top:-4px;display:flex;flex-direction:column;gap:6px;">${blocks.join("")}</div>`;
 }
 
 /** One pegRNA-pair card, shared between the live (unsaved) preview and

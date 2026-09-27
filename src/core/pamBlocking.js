@@ -51,8 +51,10 @@ function cdsPosition(offset, cds) {
  * @param {string} referenceSequence
  * @param {number} pos -- 0-based reference position to consider mutating
  * @param {CdsRange} cds
- * @returns {{synonymousBases: string[], originalBase: string, codon: string, aminoAcid: string}|null}
- *   null if `pos` isn't inside the CDS.
+ * @returns {{synonymousBases: string[], originalBase: string, codon: string, aminoAcid: string, posInCodon: number}|null}
+ *   null if `pos` isn't inside the CDS. `posInCodon` (0, 1, or 2) is
+ *   `pos`'s own position within `codon`, in the CDS's reading direction --
+ *   what a caller needs to render or edit that specific base within it.
  */
 export function findSynonymousSubstitutions(referenceSequence, pos, cds) {
   const offset = cdsOffset(pos, cds);
@@ -78,7 +80,7 @@ export function findSynonymousSubstitutions(referenceSequence, pos, cds) {
     return translateCodon(trial.join("")) === aminoAcid;
   });
 
-  return { synonymousBases, originalBase, codon: originalCodon, aminoAcid };
+  return { synonymousBases, originalBase, codon: originalCodon, aminoAcid, posInCodon };
 }
 
 /** The two genomic positions of an NGG PAM whose identity actually
@@ -116,8 +118,15 @@ export function findBlockingMutationPositions(guide, region) {
  * @property {string|null} newBase -- null if no mutation could be made here
  * @property {boolean|null} synonymous -- true (silent, CDS-constrained),
  *   null (no CDS constraint applies, freely substitutable)
- * @property {string} [codon] -- original codon, only set when synonymous !== null
+ * @property {string} [codon] -- original codon (CDS reading direction),
+ *   only set when synonymous !== null
  * @property {string} [aminoAcid]
+ * @property {number} [posInCodon] -- 0/1/2, `position`'s own place in
+ *   `codon` -- only set alongside `codon`
+ * @property {string} [mutatedCodon] -- `codon` with `posInCodon` replaced
+ *   by the substitution actually made (CDS reading direction); only set
+ *   when a substitution was actually made (newBase !== null) and CDS-
+ *   constrained
  * @property {string} [reason] -- set only when newBase is null, explaining why
  */
 
@@ -152,11 +161,14 @@ export function designBlockingMutations({ referenceSequence, guide, region, cds 
           synonymous: true,
           codon: synInfo.codon,
           aminoAcid: synInfo.aminoAcid,
+          posInCodon: synInfo.posInCodon,
           reason: `No synonymous codon for ${synInfo.aminoAcid} (${synInfo.codon}) differs at this position.`,
         };
       }
       const newBaseInCdsDir = synInfo.synonymousBases[0];
       const newBase = cds.strand === "+" ? newBaseInCdsDir : reverseComplement(newBaseInCdsDir);
+      const mutatedCodon =
+        synInfo.codon.slice(0, synInfo.posInCodon) + newBaseInCdsDir + synInfo.codon.slice(synInfo.posInCodon + 1);
       return {
         position,
         originalBase,
@@ -164,6 +176,8 @@ export function designBlockingMutations({ referenceSequence, guide, region, cds 
         synonymous: true,
         codon: synInfo.codon,
         aminoAcid: synInfo.aminoAcid,
+        posInCodon: synInfo.posInCodon,
+        mutatedCodon,
       };
     }
 
