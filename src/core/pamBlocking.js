@@ -90,6 +90,32 @@ function pamDisruptivePositions(guide) {
   return guide.strand === "+" ? [guide.pamStart + 1, guide.pamStart + 2] : [guide.pamStart, guide.pamStart + 1];
 }
 
+/** The PAM's middle base -- always genomic position pamStart+1, whichever
+ * strand the guide is on (it's the middle of the 3-base PAM regardless of
+ * reading direction). Mutating only this one, while the PAM's other G is
+ * left untouched, is the one substitution that can leave behind "NAG" --
+ * a real, if much weaker, non-canonical SpCas9 PAM -- rather than
+ * something Cas9 no longer recognizes at all. */
+function pamMiddlePosition(guide) {
+  return guide.pamStart + 1;
+}
+
+/** The genomic base at the PAM's middle position that would leave Cas9
+ * seeing "NAG" in its own reading direction (the guide reads the
+ * complement strand when guide.strand is "-", so the base to avoid there
+ * is T, whose complement is A). */
+function pamMiddleAvoidBase(guide) {
+  return guide.strand === "+" ? "A" : "T";
+}
+
+/** `candidates` (bases already filtered to exclude the original), with
+ * `avoidBase` moved to the end if it's present at all -- a preference,
+ * never an exclusion: when it's the only option left, it's still used. */
+function deprioritize(candidates, avoidBase) {
+  if (avoidBase === null || !candidates.includes(avoidBase)) return candidates;
+  return [...candidates.filter((base) => base !== avoidBase), avoidBase];
+}
+
 /** The 3 genomic positions immediately upstream of the PAM (the seed),
  * in the guide's own reading direction -- always exactly [nick, nick+3)
  * for a '+' guide or [nick-3, nick) for a '-' guide. */
@@ -146,10 +172,15 @@ export function findBlockingMutationPositions(guide, region) {
  */
 export function designBlockingMutations({ referenceSequence, guide, region, cds }) {
   const positions = findBlockingMutationPositions(guide, region);
+  const middlePosition = pamMiddlePosition(guide);
 
   return positions.map((position) => {
     const originalBase = referenceSequence[position];
     const synInfo = cds ? findSynonymousSubstitutions(referenceSequence, position, cds) : null;
+    // Only the PAM's middle base risks leaving "NAG" behind, and only in
+    // genomic terms -- convert to the CDS's own reading direction below
+    // before comparing against synInfo's (CDS-direction) candidate bases.
+    const avoidBase = position === middlePosition ? pamMiddleAvoidBase(guide) : null;
 
     if (cds && synInfo) {
       // Inside the assigned CDS: constrained to a synonymous substitution.
@@ -165,7 +196,9 @@ export function designBlockingMutations({ referenceSequence, guide, region, cds 
           reason: `No synonymous codon for ${synInfo.aminoAcid} (${synInfo.codon}) differs at this position.`,
         };
       }
-      const newBaseInCdsDir = synInfo.synonymousBases[0];
+      const avoidBaseInCdsDir = avoidBase && (cds.strand === "+" ? avoidBase : reverseComplement(avoidBase));
+      const orderedBases = deprioritize(synInfo.synonymousBases, avoidBaseInCdsDir);
+      const newBaseInCdsDir = orderedBases[0];
       const newBase = cds.strand === "+" ? newBaseInCdsDir : reverseComplement(newBaseInCdsDir);
       const mutatedCodon =
         synInfo.codon.slice(0, synInfo.posInCodon) + newBaseInCdsDir + synInfo.codon.slice(synInfo.posInCodon + 1);
@@ -183,7 +216,11 @@ export function designBlockingMutations({ referenceSequence, guide, region, cds 
 
     // No CDS assigned, or this position falls outside it: nothing
     // constrains the substitution, so any other base will do.
-    const newBase = BASES.find((base) => base !== originalBase);
+    const orderedBases = deprioritize(
+      BASES.filter((base) => base !== originalBase),
+      avoidBase
+    );
+    const newBase = orderedBases[0];
     return { position, originalBase, newBase, synonymous: null };
   });
 }

@@ -124,6 +124,44 @@ test("with a CDS, the seed's degenerate position gets a silent mutation and the 
   assert.equal(byPos[21].mutatedCodon, undefined); // nothing to show -- no substitution was made
 });
 
+// --- PAM-middle "avoid NAG" preference --------------------------------
+
+test("without a CDS, a free substitution at the PAM's middle base avoids leaving NAG behind", () => {
+  // pamStart=4 -> PAM spans [4,5,6]; middle base (pamStart+1=5) is the
+  // one that leaves "NAG" behind if it alone becomes 'A'.
+  const guide = { pamStart: 4, pamEnd: 7, nickPosition: 1, strand: "+" };
+  const mutations = designBlockingMutations({ referenceSequence: "AAAGGGGTT", guide, region: "pam" });
+  const middle = mutations.find((m) => m.position === 5);
+  assert.notEqual(middle.newBase, "A"); // 'A' would leave "NAG", a real (if weak) PAM
+  assert.ok(["C", "T"].includes(middle.newBase));
+});
+
+test("with a CDS offering multiple synonymous bases at the PAM's middle position, still avoids NAG", () => {
+  // codon [3,4,5] = "GGG" (Gly) -- all of A/C/T are synonymous at the
+  // wobble (position 5), which is also the PAM's middle base.
+  const guide = { pamStart: 4, pamEnd: 7, nickPosition: 1, strand: "+" };
+  const cds = { start: 0, end: 9, strand: "+" };
+  const mutations = designBlockingMutations({ referenceSequence: "AAAGGGGTT", guide, region: "pam", cds });
+  const middle = mutations.find((m) => m.position === 5);
+
+  assert.equal(middle.synonymous, true);
+  assert.equal(middle.aminoAcid, "G");
+  assert.notEqual(middle.newBase, "A"); // had a real choice -- didn't have to pick the NAG-forming one
+  assert.equal(middle.mutatedCodon, "GG" + middle.newBase);
+});
+
+test("still uses the NAG-forming base at the PAM's middle position when it's the only synonymous option", () => {
+  // codon [3,4,5] = "GAG" (Glu) -- only the wobble->A alternative (GAA)
+  // is synonymous; GAC/GAT are Asp. No other choice exists here.
+  const guide = { pamStart: 4, pamEnd: 7, nickPosition: 1, strand: "+" };
+  const cds = { start: 3, end: 9, strand: "+" };
+  const mutations = designBlockingMutations({ referenceSequence: "AAAGAGGTT", guide, region: "pam", cds });
+  const middle = mutations.find((m) => m.position === 5);
+
+  assert.equal(middle.aminoAcid, "E");
+  assert.equal(middle.newBase, "A"); // forced -- it's the only synonymous option there is
+});
+
 test("applyBlockingMutations only touches positions with a real newBase", () => {
   const mutations = designBlockingMutations({ referenceSequence: REFERENCE, guide: GUIDE, region: "both", cds: CDS });
   const mutated = applyBlockingMutations(REFERENCE, mutations);
