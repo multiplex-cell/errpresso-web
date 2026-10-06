@@ -7,13 +7,18 @@
 import { makePair } from "../../core/pairs.js";
 import { designPairedPegrnas } from "../../core/pegrnaDesign.js";
 import { intervalsLength } from "../../core/intervals.js";
-import { designBlockingMutations, applyBlockingMutations, describeRegionForDisplay } from "../../core/pamBlocking.js";
+import {
+  designBlockingMutations,
+  applyBlockingMutations,
+  describeRegionForDisplay,
+  clampMutationsToRtt,
+} from "../../core/pamBlocking.js";
 import { stepperFieldHtml, attachStepperField, toggleHtml, attachToggle } from "../controls.js";
 import { buildSpacerMapHtml } from "../components/spacerMap.js";
 import { buildCoverageMapHtml } from "../components/coverageMap.js";
 import { buildPegrnaCardHtml, buildPegrnaLegendHtml } from "../components/pegrnaCard.js";
+import { BLOCKING_REGION_LABELS, blockingSummaryHtml, mutationsForCsv } from "../components/blockingMutationSummary.js";
 import { wireImageDownloadButtons } from "../imageExport.js";
-import { escapeHtml } from "../domUtils.js";
 import {
   slugify,
   pegrnaSideRow,
@@ -28,13 +33,6 @@ const CSV_COLUMNS = [
   { key: "overlap_length_nt", label: "overlap_length_nt" },
   { key: "blocking_mutations", label: "blocking_mutations" },
 ];
-
-const BLOCKING_REGION_LABELS = {
-  none: "None",
-  pam: "Destroy PAM",
-  seed: "Disrupt seed (3 nt)",
-  both: "Both",
-};
 
 function defaults(record) {
   return {
@@ -166,17 +164,6 @@ export function renderManualPairMode({ record, guides, state, sidebarExtra, main
   recompute();
 }
 
-/** A blocking mutation the intended guide's own RTT is too short to
- * actually reach never makes it into the synthesized construct -- mark
- * it blocked (rather than silently dropping it) so that's visible. */
-function clampMutationsToRtt(mutations, rttStart, rttEnd) {
-  return mutations.map((m) =>
-    m.newBase && (m.position < rttStart || m.position >= rttEnd)
-      ? { ...m, newBase: null, reason: "Outside this guide's own RTT -- lengthen the RTT overlap to reach it." }
-      : m
-  );
-}
-
 /** Resolve the pair + assembled design for whatever is currently picked,
  * exactly the same computation renderMain uses for display -- shared so
  * "Save as set" saves precisely what's on screen.
@@ -273,103 +260,16 @@ function buildMapBlock(record, leftGuides, rightGuides, state, overlapRange, exo
   `;
 }
 
-/** One mutation as short, readable text: "pos 21 G→A (silent, Gly)",
- * "pos 22 blocked -- no synonymous codon for Gly (GGC)", etc. */
-function mutationText(m) {
-  if (!m.newBase) {
-    return `<span style="color:var(--danger);">pos ${m.position} blocked${m.reason ? ` — ${escapeHtml(m.reason)}` : ""}</span>`;
-  }
-  const tag = m.synonymous === true ? ` (silent, ${m.aminoAcid})` : m.synonymous === null ? "" : "";
-  const nagNote = m.stillFormsNag
-    ? ` <span style="color:var(--danger);">— still forms NAG, a weaker but real PAM</span>`
-    : "";
-  return `<span class="mono">${m.position} ${m.originalBase}→${m.newBase}</span>${tag}${nagNote}`;
-}
-
-/** Group consecutive display entries that share the same in-CDS codon into
- * one run (capped at 3 -- a codon is never more than 3 bases, so a 4th
- * entry with a matching string is always a *different* codon that just
- * happens to read the same) so the amino acid can be labeled once per
- * codon instead of once per base. Entries with no CDS context here each
- * get their own (unlabeled) group of 1, to keep column bookkeeping simple. */
-function groupByCodon(entries) {
-  const groups = [];
-  for (const entry of entries) {
-    const last = groups[groups.length - 1];
-    if (last && entry.codon !== undefined && entry.codon === last.codon && last.entries.length < 3) {
-      last.entries.push(entry);
-    } else {
-      groups.push({ codon: entry.codon, entries: [entry] });
-    }
-  }
-  return groups;
-}
-
-/** A contiguous, position-by-position (1 nt per column) track for one
- * side's whole seed/PAM region -- not just the positions a mutation was
- * attempted at, so the untouched PAM "N" still appears in context. Each
- * column shows the position, its reference base, and what happened to it
- * (the substituted base in teal, a red "x" if blocked, or a faint dot for
- * the "N", which is never a candidate); a second row underneath labels
- * each in-CDS codon's amino acid once, spanning exactly the columns that
- * belong to it. */
-function regionTrackHtml(entries) {
-  if (!entries.length) return "";
-
-  const columnHtml = (e) => {
-    const isN = !e.isCandidate;
-    const blocked = e.isCandidate && !e.newBase;
-    const baseColor = isN ? "var(--text-faint)" : blocked ? "var(--danger)" : "var(--teal)";
-    const outcome = isN
-      ? `<span style="color:var(--text-faint);">·</span>`
-      : blocked
-        ? `<span style="color:var(--danger);">✕</span>`
-        : `<span style="color:${e.stillFormsNag ? "var(--danger)" : "var(--teal)"};font-weight:700;">${escapeHtml(e.newBase)}${e.stillFormsNag ? "⚠" : ""}</span>`;
-    const background = e.regionLabel === "seed" ? "var(--accent-soft)" : "var(--bg)";
-    const border = e.stillFormsNag ? "1px dashed var(--danger)" : "1px solid transparent";
-
-    return `
-      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;padding:3px 2px;border-radius:4px;background:${background};border:${border};">
-        <div style="font-size:8.5px;color:var(--text-faint);">${e.position}</div>
-        <div class="mono" style="font-size:12px;font-weight:700;color:${baseColor};">${escapeHtml(e.originalBase)}</div>
-        <div class="mono" style="font-size:11px;">${outcome}</div>
-      </div>
-    `;
-  };
-
-  const groupLabelHtml = (group) => {
-    const label = group.codon !== undefined ? escapeHtml(group.entries[0].aminoAcid) : "";
-    return `<div style="grid-column: span ${group.entries.length};text-align:center;font-size:9.5px;color:var(--text-faint);border-top:1px solid var(--border-soft);padding-top:3px;">${label}</div>`;
-  };
-
-  return `
-    <div style="display:grid;grid-template-columns:repeat(${entries.length}, minmax(28px, 1fr));gap:2px 4px;max-width:fit-content;">
-      ${entries.map(columnHtml).join("")}
-      ${groupByCodon(entries).map(groupLabelHtml).join("")}
-    </div>
-  `;
-}
-
 /** Summary for whatever blocking mutations were attempted on this pair --
  * a text line of what changed (or why not) plus a per-nucleotide seed/PAM
  * track underneath, per side. Omitted entirely when blocking mutation
  * wasn't used. */
 function mutationSummaryHtml(mutations, regionDisplay) {
   if (!mutations) return "";
-
-  const sideBlock = (label, list, entries) => {
-    if (!list.length) return "";
-    const textLine = `<div class="caption"><strong style="color:var(--text);">${label} blocking:</strong> ${list.map(mutationText).join(" · ")}</div>`;
-    return `${textLine}${regionTrackHtml(entries || [])}`;
-  };
-
-  const blocks = [
-    sideBlock("Left", mutations.left, regionDisplay?.left),
-    sideBlock("Right", mutations.right, regionDisplay?.right),
-  ].filter(Boolean);
-  if (!blocks.length) return "";
-
-  return `<div style="border-top:1px solid var(--border-soft);padding-top:10px;margin-top:-4px;display:flex;flex-direction:column;gap:8px;">${blocks.join("")}</div>`;
+  return blockingSummaryHtml([
+    { label: "Left blocking", mutations: mutations.left, entries: regionDisplay?.left },
+    { label: "Right blocking", mutations: mutations.right, entries: regionDisplay?.right },
+  ]);
 }
 
 /** One pegRNA-pair card, shared between the live (unsaved) preview and
@@ -410,15 +310,6 @@ function buildPairCardHtml({ setNumber, pair, design, mutations, regionDisplay, 
     ],
     footnote: `Nick interval ${pair.leftGuide.nickPosition}–${pair.rightGuide.nickPosition} · overlap ${design.plan.overlapStart}–${design.plan.overlapEnd}`,
   });
-}
-
-/** Compact, CSV-friendly text for one side's mutation list, e.g.
- * "22:G>A(silent);21:blocked" -- empty string when there's nothing to say. */
-function mutationsForCsv(list) {
-  if (!list || !list.length) return "";
-  return list
-    .map((m) => (m.newBase ? `${m.position}:${m.originalBase}>${m.newBase}${m.synonymous ? "(silent)" : ""}` : `${m.position}:blocked`))
-    .join(";");
 }
 
 function buildSavedSetsBlock(record, state, exonRange) {

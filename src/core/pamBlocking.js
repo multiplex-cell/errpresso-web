@@ -359,3 +359,16 @@ export function describeRegionForDisplay({ referenceSequence, guide, region, cds
 export function mutationsWithinRtt(mutations, rttStart, rttEnd) {
   return mutations.every((m) => m.position >= rttStart && m.position < rttEnd);
 }
+
+/** A blocking mutation the intended guide's own RTT is too short to
+ * actually reach never makes it into the synthesized construct -- mark it
+ * blocked (rather than silently dropping it) so that's visible, instead
+ * of just leaving a mutation present in the design that never gets
+ * written. */
+export function clampMutationsToRtt(mutations, rttStart, rttEnd) {
+  return mutations.map((m) =>
+    m.newBase && (m.position < rttStart || m.position >= rttEnd)
+      ? { ...m, newBase: null, reason: "Outside this guide's own RTT -- lengthen the RTT (or RTT overlap) to reach it." }
+      : m
+  );
+}
